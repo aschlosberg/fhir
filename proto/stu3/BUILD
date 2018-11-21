@@ -36,11 +36,9 @@ go_proto_library(
 # keep
 go_library(
     name = "go_default_library",
-    srcs = [
-        "helpers.go",
-        "json.go",
-        "primitives.go",
-    ],
+    srcs = glob([
+        "*.pb.go",
+    ]),
     embed = [":stu3_go_proto"],
     importpath = "github.com/google/fhir/proto/stu3",
     deps = [
