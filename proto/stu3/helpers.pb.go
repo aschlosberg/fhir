@@ -51,3 +51,6 @@ func (p *Date) Time() time.Time {
 // specified precision.
 //func AsDate(t time.Time, p Date_Precision) *Date {
 //}
+
+// TODO(arrans) implement Decimal proto to numeric equivalent helpers. Should
+// these use math/big.Float?

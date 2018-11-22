@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-// Custom JSON marshalling for the FHIR primitive data types.
-
+// Package stu3 implements JSON marshalling for primitive data types in the FHIR
+// STU3 proto.
 package stu3
 
 import (
@@ -31,16 +31,6 @@ import (
 	"github.com/golang/protobuf/descriptor"
 	"github.com/golang/protobuf/proto"
 )
-
-// A FHIRPrimitive is a FHIRMessage that has additional methods for JSON
-// (un)marshalling of its value. All of the primitives are FHIRValues. Note that
-// this is not defined as those having a GetValue() method as each may return a
-// different type, and they explicitly require a means of JSON conversion.
-type FHIRPrimitive interface {
-	MarshalFHIRJSONValue() ([]byte, error)
-	UnmarshalFHIRJSONValue([]byte) error
-	FHIRMessage
-}
 
 const (
 	doubleQuote        = `"`
@@ -114,14 +104,14 @@ func reMatch(msg descriptor.Message, json []byte) error {
 	}
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Base64Binary) MarshalFHIRJSONValue() ([]byte, error) {
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Base64Binary) MarshalJSON() ([]byte, error) {
 	return jsonString(base64.StdEncoding.EncodeToString(p.Value)), nil
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
+// UnmarshalJSON populates the message's value based on the
 // FHIR-conformant JSON buffer.
-func (p *Base64Binary) UnmarshalFHIRJSONValue(buf []byte) error {
+func (p *Base64Binary) UnmarshalJSON(buf []byte) error {
 	s, err := reMatchString(p, buf)
 	if err != nil {
 		return err
@@ -134,17 +124,17 @@ func (p *Base64Binary) UnmarshalFHIRJSONValue(buf []byte) error {
 	return nil
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Boolean) MarshalFHIRJSONValue() ([]byte, error) {
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Boolean) MarshalJSON() ([]byte, error) {
 	if p.Value {
 		return []byte(`true`), nil
 	}
 	return []byte(`false`), nil
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Boolean) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Boolean) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
@@ -159,18 +149,18 @@ func (p *Boolean) UnmarshalFHIRJSONValue(buf []byte) error {
 	return fmt.Errorf(`invalid JSON boolean %s`, buf)
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Code) MarshalFHIRJSONValue() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalFHIRJSONValue unimplemented for %T", p)
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Code) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("MarshalJSON unimplemented for %T", p)
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Code) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Code) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
-	return fmt.Errorf("UnmarshalFHIRJSONValue unimplemented for %T", p)
+	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
 }
 
 const (
@@ -192,8 +182,8 @@ func utcFromMicroSec(usec int64) time.Time {
 	return time.Unix(usec/unitToMicro, (usec%microToNano)*microToNano).UTC()
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Date) MarshalFHIRJSONValue() ([]byte, error) {
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Date) MarshalJSON() ([]byte, error) {
 	if p.Timezone != "" {
 		return nil, fmt.Errorf("FHIR date primitive SHALL not have timezone; has %q", p.Timezone)
 	}
@@ -217,9 +207,9 @@ var datePrecisionLayout = map[Date_Precision]string{
 	Date_DAY:   dateLayoutDay,
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Date) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Date) UnmarshalJSON(buf []byte) error {
 	s, err := reMatchString(p, buf)
 	if err != nil {
 		return err
@@ -236,34 +226,31 @@ func (p *Date) UnmarshalFHIRJSONValue(buf []byte) error {
 	return fmt.Errorf("invalid date %s", buf)
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *DateTime) MarshalFHIRJSONValue() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalFHIRJSONValue unimplemented for %T", p)
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *DateTime) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("MarshalJSON unimplemented for %T", p)
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *DateTime) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *DateTime) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
-	return fmt.Errorf("UnmarshalFHIRJSONValue unimplemented for %T", p)
+	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Decimal) MarshalFHIRJSONValue() ([]byte, error) {
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Decimal) MarshalJSON() ([]byte, error) {
 	if err := reMatch(p, []byte(p.Value)); err != nil {
 		return nil, err
 	}
 	return []byte(p.Value), nil
 }
 
-// TODO(arrans) implement Decimal proto to numeric equivalent helpers. Should
-// these use math/big.Float?
-
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Decimal) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Decimal) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
@@ -271,42 +258,42 @@ func (p *Decimal) UnmarshalFHIRJSONValue(buf []byte) error {
 	return nil
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Id) MarshalFHIRJSONValue() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalFHIRJSONValue unimplemented for %T", p)
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Id) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("MarshalJSON unimplemented for %T", p)
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Id) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Id) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
-	return fmt.Errorf("UnmarshalFHIRJSONValue unimplemented for %T", p)
+	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Instant) MarshalFHIRJSONValue() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalFHIRJSONValue unimplemented for %T", p)
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Instant) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("MarshalJSON unimplemented for %T", p)
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Instant) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Instant) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
-	return fmt.Errorf("UnmarshalFHIRJSONValue unimplemented for %T", p)
+	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Integer) MarshalFHIRJSONValue() ([]byte, error) {
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Integer) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("%d", p.Value)), nil
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Integer) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Integer) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
@@ -318,42 +305,42 @@ func (p *Integer) UnmarshalFHIRJSONValue(buf []byte) error {
 	return nil
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Markdown) MarshalFHIRJSONValue() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalFHIRJSONValue unimplemented for %T", p)
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Markdown) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("MarshalJSON unimplemented for %T", p)
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Markdown) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Markdown) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
-	return fmt.Errorf("UnmarshalFHIRJSONValue unimplemented for %T", p)
+	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Oid) MarshalFHIRJSONValue() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalFHIRJSONValue unimplemented for %T", p)
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Oid) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("MarshalJSON unimplemented for %T", p)
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Oid) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Oid) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
-	return fmt.Errorf("UnmarshalFHIRJSONValue unimplemented for %T", p)
+	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *PositiveInt) MarshalFHIRJSONValue() ([]byte, error) {
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *PositiveInt) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("%d", p.Value)), nil
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *PositiveInt) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *PositiveInt) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
@@ -370,17 +357,17 @@ func (p *PositiveInt) UnmarshalFHIRJSONValue(buf []byte) error {
 
 const noEmptyString = "FHIR string primitive can never be empty"
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *String) MarshalFHIRJSONValue() ([]byte, error) {
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *String) MarshalJSON() ([]byte, error) {
 	if p.Value == "" {
 		return nil, errors.New(noEmptyString)
 	}
 	return jsonString(p.Value), nil
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *String) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *String) UnmarshalJSON(buf []byte) error {
 	s, err := reMatchString(p, buf)
 	if err != nil {
 		return err
@@ -392,28 +379,28 @@ func (p *String) UnmarshalFHIRJSONValue(buf []byte) error {
 	return nil
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Time) MarshalFHIRJSONValue() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalFHIRJSONValue unimplemented for %T", p)
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Time) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("MarshalJSON unimplemented for %T", p)
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Time) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Time) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
-	return fmt.Errorf("UnmarshalFHIRJSONValue unimplemented for %T", p)
+	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *UnsignedInt) MarshalFHIRJSONValue() ([]byte, error) {
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *UnsignedInt) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("%d", p.Value)), nil
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *UnsignedInt) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *UnsignedInt) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
@@ -425,44 +412,44 @@ func (p *UnsignedInt) UnmarshalFHIRJSONValue(buf []byte) error {
 	return nil
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Uri) MarshalFHIRJSONValue() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalFHIRJSONValue unimplemented for %T", p)
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Uri) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("MarshalJSON unimplemented for %T", p)
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Uri) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Uri) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
-	return fmt.Errorf("UnmarshalFHIRJSONValue unimplemented for %T", p)
+	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Uuid) MarshalFHIRJSONValue() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalFHIRJSONValue unimplemented for %T", p)
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Uuid) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("MarshalJSON unimplemented for %T", p)
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Uuid) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Uuid) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
-	return fmt.Errorf("UnmarshalFHIRJSONValue unimplemented for %T", p)
+	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
 }
 
-// MarshalFHIRJSONValue returns the message's value as FHIR-conformant JSON.
-func (p *Xhtml) MarshalFHIRJSONValue() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalFHIRJSONValue unimplemented for %T", p)
+// MarshalJSON returns the message's value as FHIR-conformant JSON.
+func (p *Xhtml) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("MarshalJSON unimplemented for %T", p)
 }
 
-// UnmarshalFHIRJSONValue populates the message's value based on the
-// FHIR-conformant JSON buffer.
-func (p *Xhtml) UnmarshalFHIRJSONValue(buf []byte) error {
+// UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
+// buffer.
+func (p *Xhtml) UnmarshalJSON(buf []byte) error {
 	if err := reMatch(p, buf); err != nil {
 		return err
 	}
-	return fmt.Errorf("UnmarshalFHIRJSONValue unimplemented for %T", p)
+	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
 }

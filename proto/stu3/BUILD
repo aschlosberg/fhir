@@ -6,7 +6,6 @@ exports_files(["version_config.textproto"])
 
 load("//bazel:proto.bzl", "fhir_proto_library")
 load("//bazel:protogen.bzl", "gen_fhir_protos")
-
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
@@ -29,6 +28,7 @@ proto_library(
 # keep
 go_proto_library(
     name = "stu3_go_proto",
+    visibility = ["//visibility:private"],
     importpath = "github.com/google/fhir/proto/stu3",
     proto = ":stu3_proto",
 )

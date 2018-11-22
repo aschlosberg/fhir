@@ -1,6 +1,7 @@
 package json
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/google/fhir/go/jsonfhir"
 
 	pb "github.com/google/fhir/proto/stu3"
 )
@@ -15,35 +17,36 @@ import (
 // Compile-time checks that each primitive-type proto satisfies the necessary
 // interfaces for JSON marshalling.
 var (
-	_ pb.FHIRPrimitive = (*pb.Base64Binary)(nil)
-	_ pb.FHIRPrimitive = (*pb.Boolean)(nil)
-	_ pb.FHIRPrimitive = (*pb.Code)(nil)
-	_ pb.FHIRPrimitive = (*pb.Date)(nil)
-	_ pb.FHIRPrimitive = (*pb.DateTime)(nil)
-	_ pb.FHIRPrimitive = (*pb.Decimal)(nil)
-	_ pb.FHIRPrimitive = (*pb.Id)(nil)
-	_ pb.FHIRPrimitive = (*pb.Instant)(nil)
-	_ pb.FHIRPrimitive = (*pb.Integer)(nil)
-	_ pb.FHIRPrimitive = (*pb.Markdown)(nil)
-	_ pb.FHIRPrimitive = (*pb.Oid)(nil)
-	_ pb.FHIRPrimitive = (*pb.PositiveInt)(nil)
-	_ pb.FHIRPrimitive = (*pb.String)(nil)
-	_ pb.FHIRPrimitive = (*pb.Time)(nil)
-	_ pb.FHIRPrimitive = (*pb.UnsignedInt)(nil)
-	_ pb.FHIRPrimitive = (*pb.Uri)(nil)
-	_ pb.FHIRPrimitive = (*pb.Uuid)(nil)
+	_ jsonfhir.STU3Element = (*pb.Base64Binary)(nil)
+	_ jsonfhir.STU3Element = (*pb.Boolean)(nil)
+	_ jsonfhir.STU3Element = (*pb.Code)(nil)
+	_ jsonfhir.STU3Element = (*pb.Date)(nil)
+	_ jsonfhir.STU3Element = (*pb.DateTime)(nil)
+	_ jsonfhir.STU3Element = (*pb.Decimal)(nil)
+	_ jsonfhir.STU3Element = (*pb.Id)(nil)
+	_ jsonfhir.STU3Element = (*pb.Instant)(nil)
+	_ jsonfhir.STU3Element = (*pb.Integer)(nil)
+	_ jsonfhir.STU3Element = (*pb.Markdown)(nil)
+	_ jsonfhir.STU3Element = (*pb.Oid)(nil)
+	_ jsonfhir.STU3Element = (*pb.PositiveInt)(nil)
+	_ jsonfhir.STU3Element = (*pb.String)(nil)
+	_ jsonfhir.STU3Element = (*pb.Time)(nil)
+	_ jsonfhir.STU3Element = (*pb.UnsignedInt)(nil)
+	_ jsonfhir.STU3Element = (*pb.Uri)(nil)
+	_ jsonfhir.STU3Element = (*pb.Uuid)(nil)
 	// TODO(arrans): why doesn't Xhtml have Extensions? The pb.FHIRMessage
 	// interface may need to be split.
-	// _ pb.FHIRPrimitive = (*pb.Xhtml)(nil)
+	// _ jsonfhir.STU3Element = (*pb.Xhtml)(nil)
 )
 
-// newEmptyPrimitive returns a new FHIRPrimitive with the same concrete type as msg.
-func newEmptyPrimitive(t *testing.T, msg pb.FHIRPrimitive) pb.FHIRPrimitive {
+// newEmptyElement returns a new FHIRPrimitive with the same concrete type as
+// msg.
+func newEmptyElement(t *testing.T, msg jsonfhir.STU3Element) jsonfhir.STU3Element {
 	t.Helper()
 	// TODO(arrans) is there a simpler way to get a new(x) without
 	// explicitly having the type?
 	concrete := reflect.ValueOf(msg).Elem().Type()
-	empty, ok := reflect.New(concrete).Interface().(pb.FHIRPrimitive)
+	empty, ok := reflect.New(concrete).Interface().(jsonfhir.STU3Element)
 	if !ok {
 		// If this happens then the test is badly coded, not actually failing.
 		t.Fatalf("bad test setup; got ok==false when casting zero-valued proto message to Message interface")
@@ -53,7 +56,7 @@ func newEmptyPrimitive(t *testing.T, msg pb.FHIRPrimitive) pb.FHIRPrimitive {
 
 func TestGoodConversions(t *testing.T) {
 	tests := []struct {
-		msg  pb.FHIRPrimitive
+		msg  jsonfhir.STU3Element
 		json string
 	}{
 		{
@@ -207,26 +210,24 @@ func TestGoodConversions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		msg := tt.msg
-		json := tt.json
-		t.Run(fmt.Sprintf("%T", msg), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%T", tt.msg), func(t *testing.T) {
 			t.Run("proto to JSON", func(t *testing.T) {
-				got, err := msg.MarshalFHIRJSONValue()
+				got, err := json.Marshal(tt.msg)
 				if err != nil {
-					t.Fatalf("MarshalFHIRJSONValue() got err %v; want nil err", err)
+					t.Fatalf("json.Marshal() got err %v; want nil err", err)
 				}
-				if got, want := string(got), json; got != want {
-					t.Errorf("marshalling %T(%+v) got JSON %s; want %s", msg, msg, got, want)
+				if got, want := string(got), tt.json; got != want {
+					t.Errorf("marshalling %T(%+v) got JSON %s; want %s", tt.msg, tt.msg, got, want)
 				}
 			})
 
 			t.Run("JSON to proto", func(t *testing.T) {
-				got := newEmptyPrimitive(t, msg)
-				if err := got.UnmarshalFHIRJSONValue([]byte(json)); err != nil {
-					t.Fatalf("%T.UnmarshalFHIRJSONValue(%s) got err %v; want nil err", got, json, err)
+				got := newEmptyElement(t, tt.msg)
+				if err := json.Unmarshal([]byte(tt.json), got); err != nil {
+					t.Fatalf("json.Unmarshal(%s, %T) got err %v; want nil err", tt.json, tt.msg, err)
 				}
-				if want := msg; !proto.Equal(got, want) {
-					t.Errorf("unmarshalling JSON %s got %+v; want %+v", json, got, want)
+				if want := tt.msg; !proto.Equal(got, want) {
+					t.Errorf("unmarshalling JSON %s got %+v; want %+v", tt.json, got, want)
 				}
 			})
 		})
@@ -237,7 +238,7 @@ func TestBadJSON(t *testing.T) {
 	tests := []struct {
 		// msg is used merely to define the type to which the JSON should be
 		// unmarshalled.
-		msg             pb.FHIRPrimitive
+		msg             jsonfhir.STU3Element
 		json            string
 		wantErrContains string
 	}{
@@ -249,17 +250,6 @@ func TestBadJSON(t *testing.T) {
 		{
 			msg:             &pb.Decimal{},
 			json:            `"42y"`,
-			wantErrContains: "regex",
-		},
-		{
-			msg: &pb.Decimal{},
-			// leading zero
-			json:            `042`,
-			wantErrContains: "regex",
-		},
-		{
-			msg:             &pb.Integer{},
-			json:            `x`,
 			wantErrContains: "regex",
 		},
 		{
@@ -276,11 +266,6 @@ func TestBadJSON(t *testing.T) {
 			msg:             &pb.Integer{},
 			json:            fmt.Sprintf("%d", int64(math.MinInt32)-1),
 			wantErrContains: "32",
-		},
-		{
-			msg:             &pb.PositiveInt{},
-			json:            `y`,
-			wantErrContains: "regex",
 		},
 		{
 			msg:             &pb.PositiveInt{},
@@ -305,11 +290,6 @@ func TestBadJSON(t *testing.T) {
 		},
 		{
 			msg:             &pb.UnsignedInt{},
-			json:            `z`,
-			wantErrContains: "regex",
-		},
-		{
-			msg:             &pb.UnsignedInt{},
 			json:            `"z"`,
 			wantErrContains: "regex",
 		},
@@ -321,14 +301,12 @@ func TestBadJSON(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		msg := tt.msg
-		json := tt.json
-		t.Run(fmt.Sprintf("%T", msg), func(t *testing.T) {
-			got := newEmptyPrimitive(t, msg)
-			if err := got.UnmarshalFHIRJSONValue([]byte(json)); err == nil {
-				t.Fatalf("UnmarshalFHIRJSONValue(%s, %T) got nil err; want err", json, got)
+		t.Run(fmt.Sprintf("%T", tt.msg), func(t *testing.T) {
+			got := newEmptyElement(t, tt.msg)
+			if err := json.Unmarshal([]byte(tt.json), got); err == nil {
+				t.Fatalf("json.Unmarshal(%s, %T) got nil err; want err", tt.json, got)
 			} else if !strings.Contains(err.Error(), tt.wantErrContains) {
-				t.Fatalf("UnmarshalFHIRJSONValue(%s, %T) got err %v; want containing %q", json, got, err, tt.wantErrContains)
+				t.Fatalf("json.Unmarshal(%s, %T) got err %v; want containing %q", tt.json, got, err, tt.wantErrContains)
 			}
 		})
 	}
@@ -337,7 +315,7 @@ func TestBadJSON(t *testing.T) {
 func TestBadProto(t *testing.T) {
 	tests := []struct {
 		// msg is used merely to define the type to which the JSON should be
-		msg             pb.FHIRPrimitive
+		msg             jsonfhir.STU3Element
 		wantErrContains string
 	}{
 		{
@@ -361,12 +339,11 @@ func TestBadProto(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		msg := tt.msg
-		t.Run(fmt.Sprintf("%T", msg), func(t *testing.T) {
-			if _, err := msg.MarshalFHIRJSONValue(); err == nil {
-				t.Fatalf("MarshalFHIRJSONValue(%T(%+v)) got nil err; want err", msg, msg)
+		t.Run(fmt.Sprintf("%T", tt.msg), func(t *testing.T) {
+			if _, err := json.Marshal(tt.msg); err == nil {
+				t.Fatalf("json.Marshal(%T(%+v)) got nil err; want err", tt.msg, tt.msg)
 			} else if !strings.Contains(err.Error(), tt.wantErrContains) {
-				t.Fatalf("MarshalFHIRJSONValue(%T(%+v)) got err %v; want containing %q", msg, msg, err, tt.wantErrContains)
+				t.Fatalf("json.Marshal(%T(%+v)) got err %v; want containing %q", tt.msg, tt.msg, err, tt.wantErrContains)
 			}
 		})
 	}

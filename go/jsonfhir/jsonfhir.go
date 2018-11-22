@@ -14,28 +14,28 @@
  * limitations under the License.
  */
 
-// Entry point for marshalling of messages to and from JSON.
-
-package stu3
+// Package jsonfhir provides marshaling between JSON and FHIR protocol buffers.
+package jsonfhir
 
 import (
-	"errors"
+	"encoding/json"
 
 	"github.com/golang/protobuf/proto"
+	pb "github.com/google/fhir/proto/stu3"
 )
 
-// A FHIRMessage is any proto.Message that has both String ID and Extension
-// fields.
-type FHIRMessage interface {
-	GetId() *String
-	GetExtension() []*Extension
+// An STU3Message is any proto.Message that has both stu3.String ID and repeated
+// stu3.Extension fields.
+type STU3Message interface {
 	proto.Message
+	GetId() *pb.String
+	GetExtension() []*pb.Extension
 }
 
-func MarshalJSON(_ FHIRMessage) ([]byte, error) {
-	return nil, errors.New("MarshalJSON() not implemented")
-}
-
-func UnmarshalJSON(_ []byte, _ FHIRMessage) error {
-	return errors.New("UnmarshalJSON() not implemented")
+// An STU3Element is a STU3Message that has additional methods for JSON
+// (un)marshalling of its value. All of the primitives are STU3Elements.
+type STU3Element interface {
+	STU3Message
+	json.Marshaler
+	json.Unmarshaler
 }
