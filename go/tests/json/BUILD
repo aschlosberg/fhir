@@ -6,7 +6,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
 go_test(
     name = "go_default_test",
-    srcs = ["primitives_test.go"],
+    srcs = ["elements_test.go"],
     deps = [
         "//go/jsonfhir:go_default_library",
         "//proto/stu3:go_default_library",

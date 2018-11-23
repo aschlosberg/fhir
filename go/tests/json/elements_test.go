@@ -14,9 +14,10 @@ import (
 	pb "github.com/google/fhir/proto/stu3"
 )
 
-// Compile-time checks that each primitive-type proto satisfies the necessary
-// interfaces for JSON marshalling.
+// Compile-time checks that all primitive-type and special-purpose elements
+// satisfy the necessary interfaces for JSON marshalling.
 var (
+	// Primitives
 	_ jsonfhir.STU3Element = (*pb.Base64Binary)(nil)
 	_ jsonfhir.STU3Element = (*pb.Boolean)(nil)
 	_ jsonfhir.STU3Element = (*pb.Code)(nil)
@@ -37,6 +38,13 @@ var (
 	// TODO(arrans): why doesn't Xhtml have Extensions? The pb.FHIRMessage
 	// interface may need to be split.
 	// _ jsonfhir.STU3Element = (*pb.Xhtml)(nil)
+
+	// Special-purpose elements
+	_ jsonfhir.STU3Element = (*pb.Dosage)(nil)
+	_ jsonfhir.STU3Element = (*pb.Extension)(nil)
+	_ jsonfhir.STU3Element = (*pb.Meta)(nil)
+	_ jsonfhir.STU3Element = (*pb.Narrative)(nil)
+	_ jsonfhir.STU3Element = (*pb.Reference)(nil)
 )
 
 // newEmptyElement returns a new FHIRPrimitive with the same concrete type as
