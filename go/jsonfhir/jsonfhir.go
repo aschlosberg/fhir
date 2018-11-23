@@ -47,26 +47,52 @@ type STU3Element interface {
 	GetId() *pb.String
 	json.Marshaler
 	json.Unmarshaler
+
+	// JSONFHIRMarshaler is a no-op function, required internally by this
+	// package simply to improve type safety at compile time, instead of using
+	// the empty interface{}.
+	JSONFHIRMarshaler()
 }
 
 // MarshalSTU3JSON IS INCOMPLETE AND SHOULD NOT BE USED YET. It returns the
 // STU3Resource in JSON format.
 func MarshalSTU3JSON(msg STU3Resource) ([]byte, error) {
-	m, err := marshalToMap(msg, "/")
+	m, err := marshalToTree(msg, "/")
 	if err != nil {
 		return nil, err
 	}
 	return json.Marshal(m)
 }
 
-// marshalToMap converts the resource into a map of strings to empty interfaces,
-// allowing for eventual marshaling with encoding/json.MarshalJSON(). It is
-// called recursively, and the keyPath carries the path to the key on which the
-// error occurred; the original call should have keyPath = "/".
-func marshalToMap(msg STU3Resource, keyPath string) (_ map[string]interface{}, retErr error) {
+// A marshalTree is a recursive structure mapping strings to marshalNodes, which
+// are either other marshalTrees, or concrete types that can be marshalled to
+// FHIR-compliant JSON. It is used instead of a map[string]interface{} simply to
+// improve type safety, but is still passed to json.Marshal() to be handled in
+// the same manner.
+type marshalTree map[string]marshalNode
+
+func (marshalTree) JSONFHIRMarshaler() {}
+
+// A marshalNode indicates that an arbitrary type can act as a node of a
+// marshalTree.
+type marshalNode interface {
+	JSONFHIRMarshaler()
+}
+
+type nodeSlice []marshalNode
+
+func (nodeSlice) JSONFHIRMarshaler() {}
+
+// marshalToTree converts the resource into marshalTree, allowing for eventual
+// marshaling with encoding/json.MarshalJSON(). It acts recursively via calls to
+// marshalField, which may call marshalToTree, and is terminated by discovery of
+// STU3Elements in the STU3Resource. The nodePath carries the path to the node
+// in the tree that is currently being processed; therefore the original call
+// should have nodePath = "/".
+func marshalToTree(msg STU3Resource, nodePath string) (_ marshalTree, retErr error) {
 	defer func() {
 		if retErr != nil {
-			retErr = fmt.Errorf("[%s] %v", keyPath, retErr)
+			retErr = fmt.Errorf("[%s] %v", nodePath, retErr)
 		}
 	}()
 
@@ -77,11 +103,11 @@ func marshalToMap(msg STU3Resource, keyPath string) (_ map[string]interface{}, r
 
 	val := mVal.Elem()
 	if k := val.Kind(); k != reflect.Struct {
-		return nil, fmt.Errorf("cannot convert non-struct (%s) to map", k)
+		return nil, fmt.Errorf("cannot convert non-struct (%s) to tree", k)
 	}
 
-	mapped := map[string]interface{}{
-		`resourceType`: `x`,
+	tree := marshalTree{
+		"resourceType": &pb.String{Value: val.Type().Name()},
 	}
 
 	for i, n := 0, val.NumField(); i < n; i++ {
@@ -90,40 +116,52 @@ func marshalToMap(msg STU3Resource, keyPath string) (_ map[string]interface{}, r
 			continue
 		}
 
-		key, ok := jsonName(val.Type().Field(i).Tag)
+		lbl, ok := jsonName(val.Type().Field(i).Tag)
 		if !ok {
 			continue
 		}
-		keyPath = fmt.Sprintf("%s%s/", keyPath, key)
+		nodePath := fmt.Sprintf("%s%s/", nodePath, lbl)
 
 		switch fld.Kind() {
+		case reflect.Ptr:
+			mf, uscore, err := marshalField(fld, nodePath)
+			if err != nil {
+				return nil, err
+			}
+			tree[lbl] = mf
+			if !uscore.empty() {
+				tree[fmt.Sprintf("_%s", lbl)] = uscore
+			}
+		// A slice is treated in the exact same way as a pointer, but once for
+		// each element. The slice of Underscore properties is added if any
+		// element has a non-nil value.
 		case reflect.Slice:
 			n := fld.Len()
 			if n == 0 {
 				break
 			}
-			all := make([]interface{}, n)
+			all := make(nodeSlice, n)
+			uscores := make(nodeSlice, n)
+			var hasUnderscore bool
 			for i := 0; i < n; i++ {
-				mf, _, err := marshalField(fld, fmt.Sprintf("%s[%d]", keyPath, i))
+				mf, uscore, err := marshalField(fld, fmt.Sprintf("%s[%d]", nodePath, i))
 				if err != nil {
 					return nil, err
 				}
 				all[i] = mf
+				if !uscore.empty() {
+					uscores[i] = uscore
+					hasUnderscore = true
+				}
 			}
-			mapped[key] = all
-		case reflect.Ptr:
-			mf, uscore, err := marshalField(fld, keyPath)
-			if err != nil {
-				return nil, err
-			}
-			mapped[key] = mf
-			if !uscore.empty() {
-				mapped[fmt.Sprintf("_%s", key)] = uscore
+			tree[lbl] = all
+			if hasUnderscore {
+				tree[fmt.Sprintf("_%s", lbl)] = uscores
 			}
 		}
 	}
 
-	return mapped, nil
+	return tree, nil
 }
 
 // STU3Underscore represents a JSON property prepended with an underscore, as
@@ -131,13 +169,17 @@ func marshalToMap(msg STU3Resource, keyPath string) (_ map[string]interface{}, r
 type STU3Underscore struct {
 	ID        *pb.String      `json:"id,omitempty"`
 	Extension []*pb.Extension `json:"extension,omitempty"`
+
+	marshalNode
 }
 
+// empty returns false if either u.ID contains a non-empty string, or there is
+// at least one non-nil Extension.
 func (u *STU3Underscore) empty() bool {
 	if u == nil {
 		return true
 	}
-	if u.ID != nil {
+	if u.ID != nil && u.ID.Value != "" {
 		return false
 	}
 	for _, e := range u.Extension {
@@ -148,30 +190,34 @@ func (u *STU3Underscore) empty() bool {
 	return true
 }
 
-// marshalField is the field-level counterpart for marshalToMap. The first
-// returned interface{} is fld.Interface() if the value is an STU3Element,
-// otherwise the field is sent back to marshalToMap if is is an STU3Resrouce.
-func marshalField(fld reflect.Value, keyPath string) (interface{}, *STU3Underscore, error) {
+// marshalField is the field-level counterpart for marshalToTree, producing a
+// single node from a struct field. If the field contains an STU3Element, itself
+// a marshalNode, it is simply returned, otherwise the field's value is recursed
+// back into marshalToTree.
+func marshalField(fld reflect.Value, nodePath string) (marshalNode, *STU3Underscore, error) {
 	ifc := fld.Interface()
 
 	uscore := new(STU3Underscore)
+	if ext, ok := ifc.(STU3Extensible); ok {
+		uscore.Extension = ext.GetExtension()
+	}
 
 	if el, ok := ifc.(STU3Element); ok {
 		uscore.ID = el.GetId()
-		// TODO(arrans) just return el directly once they're all implemented.
-		buf, err := el.MarshalJSON()
-		if err != nil && !strings.Contains(err.Error(), "unimplemented") {
+		// TODO(arrans) remove this once MarshalJSON is implemented on all
+		// Elements.
+		if _, err := el.MarshalJSON(); err != nil && strings.Contains(err.Error(), "unimplemented") {
 			return nil, nil, err
 		}
-		return json.RawMessage(buf), uscore, nil
+		return el, uscore, nil
 	}
 
 	if res, ok := ifc.(STU3Resource); ok {
-		mm, err := marshalToMap(res, keyPath)
+		mt, err := marshalToTree(res, nodePath)
 		if err != nil {
 			return nil, nil, err
 		}
-		return mm, uscore, nil
+		return mt, uscore, nil
 	}
 
 	return nil, nil, fmt.Errorf("unsupported field type %T", ifc)
@@ -183,8 +229,31 @@ func jsonName(t reflect.StructTag) (string, bool) {
 		return "", false
 	}
 	parts := strings.Split(tag, ",")
-	if len(parts) == 0 || parts[0] == "" {
+	if len(parts) == 0 || parts[0] == "" || parts[0] == "-" {
 		return "", false
 	}
-	return parts[0], true
+	return snakeToCamel(parts[0]), true
+}
+
+func snakeToCamel(s string) string {
+	s = strings.ToLower(s)
+	var b strings.Builder
+	b.Grow(len(s))
+
+	var last int
+	for i, n := 0, len(s); i < n; i++ {
+		if s[i] == '_' {
+			b.WriteString(s[last:i])
+			i++
+			if i < n && s[i] >= 'a' && s[i] <= 'z' {
+				b.WriteByte(s[i] - 'a' + 'A')
+				i++
+			}
+			last = i
+		}
+	}
+	if last < len(s) {
+		b.WriteString(s[last:])
+	}
+	return b.String()
 }
