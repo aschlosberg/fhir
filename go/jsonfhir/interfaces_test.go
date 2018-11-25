@@ -29,7 +29,6 @@ var (
 
 	// Special-purpose elements
 	_ stu3Element = (*pb.Dosage)(nil)
-	_ stu3Element = (*pb.Extension)(nil)
 	_ stu3Element = (*pb.Meta)(nil)
 	_ stu3Element = (*pb.Narrative)(nil)
 	_ stu3Element = (*pb.Reference)(nil)

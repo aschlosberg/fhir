@@ -66,14 +66,9 @@ type stu3Element interface {
 	JSONFHIRMarshaler()
 }
 
-// MarshalSTU3JSON IS INCOMPLETE AND SHOULD NOT BE USED YET. It returns the
-// message in JSON format. The behaviour of MarshalSTU3JSON is undefined for
-// messages from other proto packages.
-func MarshalSTU3JSON(msg descriptor.Message) ([]byte, error) {
-	if el, ok := msg.(stu3Element); ok {
-		return el.MarshalJSON()
-	}
-
+// MarshalSTU3 IS INCOMPLETE AND SHOULD NOT BE USED YET. It returns the Resouce
+// in JSON format.
+func MarshalSTU3(msg STU3Resource) ([]byte, error) {
 	m, err := marshalToTree(msg, "/")
 	if err != nil {
 		return nil, err
@@ -132,8 +127,9 @@ func marshalToTree(msgInterface descriptor.Message, baseNodePath string) (_ mars
 		fldDescs[f.GetName()] = f
 	}
 
-	tree := marshalTree{
-		"resourceType": &pb.String{Value: msg.Type().Name()},
+	tree := make(marshalTree)
+	if _, ok := msg.Interface().(STU3Resource); ok {
+		tree["resourceType"] = &pb.String{Value: msg.Type().Name()}
 	}
 
 	for i, n := 0, msg.NumField(); i < n; i++ {
@@ -212,8 +208,9 @@ func marshalToTree(msgInterface descriptor.Message, baseNodePath string) (_ mars
 	return tree, nil
 }
 
-// stu3Underscore represents a JSON property prepended with an underscore, as
-// described by https://www.hl7.org/fhir/json.html#primitive.
+// stu3Underscore represents a JSON property prepended with an underscore, used
+// for ID and extension attributes of primitives, as described by
+// https://www.hl7.org/fhir/json.html#primitive.
 type stu3Underscore struct {
 	ID        *pb.String      `json:"id,omitempty"`
 	Extension []*pb.Extension `json:"extension,omitempty"`
@@ -256,19 +253,13 @@ func underscore(msg proto.Message) *stu3Underscore {
 func marshalValue(val reflect.Value, nodePath string) (marshalNode, *stu3Underscore, error) {
 	ifc := val.Interface()
 
-	msg, ok := ifc.(proto.Message)
-	if !ok {
-		return nil, nil, fmt.Errorf("cannot marshal non proto.Message %T", ifc)
-	}
-	uscore := underscore(msg)
-
 	if el, ok := ifc.(stu3Element); ok {
 		// TODO(arrans) remove this once MarshalJSON is implemented on all
 		// Elements.
 		if _, err := el.MarshalJSON(); err != nil && strings.Contains(err.Error(), "unimplemented") {
 			return nil, nil, err
 		}
-		return el, uscore, nil
+		return el, underscore(el), nil
 	}
 
 	if id, ok := ifc.(stu3Identifiable); ok {
@@ -276,7 +267,7 @@ func marshalValue(val reflect.Value, nodePath string) (marshalNode, *stu3Undersc
 		if err != nil {
 			return nil, nil, err
 		}
-		return mt, uscore, nil
+		return mt, nil, nil
 	}
 
 	if res, ok := ifc.(STU3Resource); ok {
@@ -284,7 +275,7 @@ func marshalValue(val reflect.Value, nodePath string) (marshalNode, *stu3Undersc
 		if err != nil {
 			return nil, nil, err
 		}
-		return mt, uscore, nil
+		return mt, nil, nil
 	}
 
 	return nil, nil, fmt.Errorf("unsupported field type %T", ifc)

@@ -187,6 +187,12 @@ func TestGoodConversions(t *testing.T) {
 			},
 			json: `4294967295`,
 		},
+		{
+			msg: &pb.Uri{
+				Value: `urn:uuid:53fefa32-fcbb-4ff8-8a92-55ee120877b7`,
+			},
+			json: `"urn:uuid:53fefa32-fcbb-4ff8-8a92-55ee120877b7"`,
+		},
 	}
 
 	for _, tt := range tests {

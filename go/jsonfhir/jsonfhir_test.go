@@ -38,11 +38,21 @@ func TestMarshalSTU3JSON(t *testing.T) {
 			Id: &pb.String{
 				Value: "theday",
 			},
+			Extension: []*pb.Extension{
+				{
+					Id:  &pb.String{Value: "thedayext"},
+					Url: &pb.Uri{Value: "www.example.com"},
+				},
+			},
 			ValueUs:   529977600000000,
 			Precision: pb.Date_DAY,
 		},
 		Name: []*pb.HumanName{
 			{
+				Id: &pb.String{Value: "thename"},
+				Extension: []*pb.Extension{
+					{Id: &pb.String{Value: "nameext"}},
+				},
 				Family: &pb.String{Value: "Smith"},
 				Given: []*pb.String{
 					{
@@ -61,13 +71,13 @@ func TestMarshalSTU3JSON(t *testing.T) {
 			},
 		},
 	}
-	got, err := MarshalSTU3JSON(p)
+	got, err := MarshalSTU3(p)
 	if err != nil {
 		t.Fatalf("MarshalSTU3JSON(%T %s) got err %v; want nil err", p, p, err)
 	}
-	want := []byte(`{"_birthDate":{"id":"theday"},"active":true,"birthDate":"1986-10-18","deceasedBoolean":true,"name":[{"_given":[null,{"id":"middle"}],"family":"Smith","given":["Mary","Jane"],"resourceType":"HumanName"}],"resourceType":"Patient"}`)
+	want := []byte(`{"_birthDate":{"id":"theday","extension":[{"id":"thedayext","url":"www.example.com"}]},"active":true,"birthDate":"1986-10-18","deceasedBoolean":true,"name":[{"_given":[null,{"id":"middle"}],"extension":[{"id":"nameext"}],"family":"Smith","given":["Mary","Jane"],"id":"thename"}]}`)
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("MarshalSTU3JSON(%T %s) got:\n%s\nwant:\n%s", p, p, prettyJSON(got), prettyJSON(want))
+		t.Errorf("MarshalSTU3JSON(%T %s) got:\n%s\nwant:\n%s", p, p, got, prettyJSON(want))
 	}
 }
 
