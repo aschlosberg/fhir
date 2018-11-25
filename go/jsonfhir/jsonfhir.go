@@ -101,7 +101,8 @@ func (nodeSlice) JSONFHIRMarshaler() {}
 // stu3Elements in the STU3Resource. The nodePath carries the path to the node
 // in the tree that is currently being processed; therefore the original call
 // should have nodePath = "/".
-func marshalToTree(msgInterface descriptor.Message, nodePath string) (_ marshalTree, retErr error) {
+func marshalToTree(msgInterface descriptor.Message, baseNodePath string) (_ marshalTree, retErr error) {
+	nodePath := baseNodePath
 	defer func() {
 		if retErr != nil {
 			retErr = fmt.Errorf("[%s] %v", nodePath, retErr)
@@ -118,6 +119,8 @@ func marshalToTree(msgInterface descriptor.Message, nodePath string) (_ marshalT
 		return nil, fmt.Errorf("cannot convert non-struct (%s) to tree", k)
 	}
 
+	// FieldDescriptorProtos are used to check for choice-type option
+	// extensions.
 	fldDescs := make(map[string]*dpb.FieldDescriptorProto)
 	_, md := descriptor.ForMessage(msgInterface)
 	for _, f := range md.Field {
@@ -141,11 +144,10 @@ func marshalToTree(msgInterface descriptor.Message, nodePath string) (_ marshalT
 			continue
 		}
 
-		lbl, ok := jsonName(fld.Tag)
+		name, ok := jsonName(fld.Tag)
 		if !ok {
 			continue
 		}
-		nodePath := fmt.Sprintf("%s%s/", nodePath, lbl)
 
 		choice, err := extractIfChoiceType(val, fld, fldDescs)
 		if err != nil {
@@ -153,18 +155,21 @@ func marshalToTree(msgInterface descriptor.Message, nodePath string) (_ marshalT
 		}
 		if choice.IsValid() {
 			val = choice
-			lbl = fmt.Sprintf("%s%s", lbl, val.Elem().Type().Name())
+			name = fmt.Sprintf("%s%s", name, val.Elem().Type().Name())
 		}
 
 		switch val.Kind() {
 		case reflect.Ptr:
+			nodePath = fmt.Sprintf("%s%s/", baseNodePath, name)
+
 			mv, uscore, err := marshalValue(val, nodePath)
 			if err != nil {
 				return nil, err
 			}
-			tree[lbl] = mv
+
+			tree[name] = mv
 			if !uscore.empty() {
-				tree[fmt.Sprintf("_%s", lbl)] = uscore
+				tree[fmt.Sprintf("_%s", name)] = uscore
 			}
 		// A slice is treated in the exact same way as a pointer, but once for
 		// each element. The slice of Underscore properties is added if any
@@ -177,7 +182,10 @@ func marshalToTree(msgInterface descriptor.Message, nodePath string) (_ marshalT
 			all := make(nodeSlice, n)
 			uscores := make(nodeSlice, n)
 			var hasUnderscore bool
+
 			for i := 0; i < n; i++ {
+				nodePath = fmt.Sprintf("%s%s[%d]/", baseNodePath, name, i)
+
 				mv, uscore, err := marshalValue(val.Index(i), fmt.Sprintf("%s[%d]", nodePath, i))
 				if err != nil {
 					return nil, err
@@ -188,9 +196,10 @@ func marshalToTree(msgInterface descriptor.Message, nodePath string) (_ marshalT
 					hasUnderscore = true
 				}
 			}
-			tree[lbl] = all
+
+			tree[name] = all
 			if hasUnderscore {
-				tree[fmt.Sprintf("_%s", lbl)] = uscores
+				tree[fmt.Sprintf("_%s", name)] = uscores
 			}
 		}
 	}
@@ -242,9 +251,9 @@ func underscore(msg proto.Message) *stu3Underscore {
 func marshalValue(val reflect.Value, nodePath string) (marshalNode, *stu3Underscore, error) {
 	ifc := val.Interface()
 
-	msg, ok := ifc.(descriptor.Message)
+	msg, ok := ifc.(proto.Message)
 	if !ok {
-		return nil, nil, fmt.Errorf("cannot marshal non descriptor.Message %T", ifc)
+		return nil, nil, fmt.Errorf("cannot marshal non proto.Message %T", ifc)
 	}
 	uscore := underscore(msg)
 
@@ -276,6 +285,14 @@ func marshalValue(val reflect.Value, nodePath string) (marshalNode, *stu3Undersc
 	return nil, nil, fmt.Errorf("unsupported field type %T", ifc)
 }
 
+// extractIfChoiceType receives a struct field's value and respective
+// StructField, along with a map from proto field names to descriptor protos.
+// The StructField is used to extract the protoName from the tag, which is then
+// retrieved from the descs map. If the retrieved value indicates that val holds
+// a choice type, the underlying value is extracted and returned.
+//
+// If no error occurs, but it is not a choice-type field, then the returned
+// Value will be zero and this can be checked with its IsValid() method.
 func extractIfChoiceType(val reflect.Value, fld reflect.StructField, descs map[string]*dpb.FieldDescriptorProto) (reflect.Value, error) {
 	name, ok := protoName(fld.Tag)
 	if !ok {
@@ -306,8 +323,8 @@ func extractIfChoiceType(val reflect.Value, fld reflect.StructField, descs map[s
 
 	// As it's a oneof, the value will be an interface and the concrete type
 	// will be a pointer to a struct with exactly one field.
-	if t := choice[0].Type(); t.Kind() != reflect.Interface {
-		return reflect.Value{}, fmt.Errorf("%s.%s() must return interface; got %s", fld.Name, fn, t.Kind())
+	if t := choice[0].Type(); t.Kind() != reflect.Interface || choice[0].IsNil() {
+		return reflect.Value{}, fmt.Errorf("%s.%s() must return interface containing non-nil value; got %s", fld.Name, fn, t.Kind())
 	}
 	one := reflect.ValueOf(choice[0].Interface()).Elem()
 	if t := one.Type(); t.Kind() != reflect.Struct || t.NumField() != 1 {
@@ -336,6 +353,8 @@ func protoName(t reflect.StructTag) (string, bool) {
 	return "", false
 }
 
+// jsonName extracts the name from the json section of the tag, and returns it
+// in camel case.
 func jsonName(t reflect.StructTag) (string, bool) {
 	tag, ok := t.Lookup("json")
 	if !ok {
