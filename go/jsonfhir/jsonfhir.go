@@ -33,7 +33,7 @@ import (
 // method, allowing for extraction of the descriptor protos, and hence checking
 // of extension options.
 
-// An STU3Resource is any descriptor.Message that as an stu3.Id logical
+// An STU3Resource is any descriptor.Message that has an stu3.Id logical
 // identifier.
 type STU3Resource interface {
 	descriptor.Message
@@ -46,7 +46,7 @@ type stu3Extensible interface {
 	GetExtension() []*pb.Extension
 }
 
-// An stu3Identifiable is any descriptor.Message that as an stu3.Id String
+// An stu3Identifiable is any descriptor.Message that has an stu3.Id String
 // identifier.
 type stu3Identifiable interface {
 	descriptor.Message
@@ -67,8 +67,13 @@ type stu3Element interface {
 }
 
 // MarshalSTU3JSON IS INCOMPLETE AND SHOULD NOT BE USED YET. It returns the
-// STU3Resource in JSON format.
-func MarshalSTU3JSON(msg STU3Resource) ([]byte, error) {
+// message in JSON format. The behaviour of MarshalSTU3JSON is undefined for
+// messages from other proto packages.
+func MarshalSTU3JSON(msg descriptor.Message) ([]byte, error) {
+	if el, ok := msg.(stu3Element); ok {
+		return el.MarshalJSON()
+	}
+
 	m, err := marshalToTree(msg, "/")
 	if err != nil {
 		return nil, err

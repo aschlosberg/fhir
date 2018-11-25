@@ -71,10 +71,18 @@ func TestMarshalSTU3JSON(t *testing.T) {
 	}
 }
 
+func TestExtractIfChoiceType(t *testing.T) {
+	// TODO(arrans)
+}
+
 func TestJSONName(t *testing.T) {
 	// TODO(arrans)
 }
 
 func TestSnakeToCamel(t *testing.T) {
 	// TODO(arrans)
+}
+
+func TestUnderscore(t *testing.T) {
+	// TODO(arrans) test the underscore() function
 }
