@@ -23,28 +23,40 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/golang/protobuf/descriptor"
 	"github.com/golang/protobuf/proto"
+	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	pb "github.com/google/fhir/proto/stu3"
 )
 
-// An STU3Extensible is any proto.Message that has stu3.Extensions.
-type STU3Extensible interface {
-	proto.Message
-	GetExtension() []*pb.Extension
-}
+// NOTE: a descriptor.Message is simply a proto.Message with one additoinal
+// method, allowing for extraction of the descriptor protos, and hence checking
+// of extension options.
 
-// An STU3Resource is any proto.Message that as an stu3.Id logical identifier.
+// An STU3Resource is any descriptor.Message that as an stu3.Id logical
+// identifier.
 type STU3Resource interface {
-	proto.Message
+	descriptor.Message
 	GetId() *pb.Id
 }
 
-// An STU3Element is any proto.Message that has an stu3.String ID. It must also
-// have a means of (un)marshaling itself to and from JSON. All of the STU3
-// primitives are STU3Elements.
-type STU3Element interface {
-	proto.Message
+// An stu3Extensible is any descriptor.Message that has stu3.Extensions.
+type stu3Extensible interface {
+	descriptor.Message
+	GetExtension() []*pb.Extension
+}
+
+// An stu3Identifiable is any descriptor.Message that as an stu3.Id String
+// identifier.
+type stu3Identifiable interface {
+	descriptor.Message
 	GetId() *pb.String
+}
+
+// An stu3Element is an stu3Identifiable that also has a means of (un)marshaling
+// itself to and from JSON. All of the stu3 primitives are stu3Elements.
+type stu3Element interface {
+	stu3Identifiable
 	json.Marshaler
 	json.Unmarshaler
 
@@ -85,50 +97,73 @@ func (nodeSlice) JSONFHIRMarshaler() {}
 
 // marshalToTree converts the resource into marshalTree, allowing for eventual
 // marshaling with encoding/json.MarshalJSON(). It acts recursively via calls to
-// marshalField, which may call marshalToTree, and is terminated by discovery of
-// STU3Elements in the STU3Resource. The nodePath carries the path to the node
+// marshalValue, which may call marshalToTree, and is terminated by discovery of
+// stu3Elements in the STU3Resource. The nodePath carries the path to the node
 // in the tree that is currently being processed; therefore the original call
 // should have nodePath = "/".
-func marshalToTree(msg STU3Resource, nodePath string) (_ marshalTree, retErr error) {
+func marshalToTree(r STU3Resource, nodePath string) (_ marshalTree, retErr error) {
 	defer func() {
 		if retErr != nil {
 			retErr = fmt.Errorf("[%s] %v", nodePath, retErr)
 		}
 	}()
 
-	mVal := reflect.ValueOf(msg)
-	if msg == nil || mVal.IsNil() {
+	rVal := reflect.ValueOf(r)
+	if r == nil || rVal.IsNil() {
 		return nil, nil
 	}
 
-	val := mVal.Elem()
-	if k := val.Kind(); k != reflect.Struct {
+	// msg holds the protobuf message struct
+	msg := rVal.Elem()
+	if k := msg.Kind(); k != reflect.Struct {
 		return nil, fmt.Errorf("cannot convert non-struct (%s) to tree", k)
 	}
 
-	tree := marshalTree{
-		"resourceType": &pb.String{Value: val.Type().Name()},
+	fldDescs := make(map[string]*dpb.FieldDescriptorProto)
+	_, md := descriptor.ForMessage(r)
+	for _, f := range md.Field {
+		fldDescs[f.GetName()] = f
 	}
 
-	for i, n := 0, val.NumField(); i < n; i++ {
-		fld := val.Field(i)
-		if !fld.CanInterface() || (fld.Kind() == reflect.Ptr && fld.IsNil()) {
+	tree := marshalTree{
+		"resourceType": &pb.String{Value: msg.Type().Name()},
+	}
+
+	for i, n := 0, msg.NumField(); i < n; i++ {
+		// val holds the actual value in the struct field whereas fld is a
+		// reflect.StructField, describing the field. Reflection is confusing,
+		// but at least it's fun :)
+		val := msg.Field(i)
+		fld := msg.Type().Field(i)
+
+		if !val.CanInterface() ||
+			(val.Kind() == reflect.Ptr && val.IsNil()) ||
+			(val.Kind() == reflect.Slice && val.Len() == 0) {
 			continue
 		}
 
-		lbl, ok := jsonName(val.Type().Field(i).Tag)
+		lbl, ok := jsonName(fld.Tag)
 		if !ok {
 			continue
 		}
 		nodePath := fmt.Sprintf("%s%s/", nodePath, lbl)
 
-		switch fld.Kind() {
+		choice, err := extractIfChoiceType(val, fld, fldDescs)
+		if err != nil {
+			return nil, fmt.Errorf("detecting choice-type field: %v", err)
+		}
+		if choice.IsValid() {
+			val = choice
+			lbl = fmt.Sprintf("%s%s", lbl, val.Elem().Type().Name())
+		}
+
+		switch val.Kind() {
 		case reflect.Ptr:
-			mf, uscore, err := marshalField(fld, nodePath)
+			mv, uscore, err := marshalValue(val, nodePath)
 			if err != nil {
 				return nil, err
 			}
-			tree[lbl] = mf
+			tree[lbl] = mv
 			if !uscore.empty() {
 				tree[fmt.Sprintf("_%s", lbl)] = uscore
 			}
@@ -136,7 +171,7 @@ func marshalToTree(msg STU3Resource, nodePath string) (_ marshalTree, retErr err
 		// each element. The slice of Underscore properties is added if any
 		// element has a non-nil value.
 		case reflect.Slice:
-			n := fld.Len()
+			n := val.Len()
 			if n == 0 {
 				break
 			}
@@ -144,11 +179,11 @@ func marshalToTree(msg STU3Resource, nodePath string) (_ marshalTree, retErr err
 			uscores := make(nodeSlice, n)
 			var hasUnderscore bool
 			for i := 0; i < n; i++ {
-				mf, uscore, err := marshalField(fld, fmt.Sprintf("%s[%d]", nodePath, i))
+				mv, uscore, err := marshalValue(val, fmt.Sprintf("%s[%d]", nodePath, i))
 				if err != nil {
 					return nil, err
 				}
-				all[i] = mf
+				all[i] = mv
 				if !uscore.empty() {
 					uscores[i] = uscore
 					hasUnderscore = true
@@ -164,9 +199,9 @@ func marshalToTree(msg STU3Resource, nodePath string) (_ marshalTree, retErr err
 	return tree, nil
 }
 
-// STU3Underscore represents a JSON property prepended with an underscore, as
+// stu3Underscore represents a JSON property prepended with an underscore, as
 // described by https://www.hl7.org/fhir/json.html#primitive.
-type STU3Underscore struct {
+type stu3Underscore struct {
 	ID        *pb.String      `json:"id,omitempty"`
 	Extension []*pb.Extension `json:"extension,omitempty"`
 
@@ -175,7 +210,7 @@ type STU3Underscore struct {
 
 // empty returns false if either u.ID contains a non-empty string, or there is
 // at least one non-nil Extension.
-func (u *STU3Underscore) empty() bool {
+func (u *stu3Underscore) empty() bool {
 	if u == nil {
 		return true
 	}
@@ -190,19 +225,31 @@ func (u *STU3Underscore) empty() bool {
 	return true
 }
 
-// marshalField is the field-level counterpart for marshalToTree, producing a
-// single node from a struct field. If the field contains an STU3Element, itself
-// a marshalNode, it is simply returned, otherwise the field's value is recursed
-// back into marshalToTree.
-func marshalField(fld reflect.Value, nodePath string) (marshalNode, *STU3Underscore, error) {
-	ifc := fld.Interface()
-
-	uscore := new(STU3Underscore)
-	if ext, ok := ifc.(STU3Extensible); ok {
-		uscore.Extension = ext.GetExtension()
+func underscore(msg proto.Message) *stu3Underscore {
+	u := new(stu3Underscore)
+	if i, ok := msg.(stu3Identifiable); ok {
+		u.ID = i.GetId()
 	}
+	if e, ok := msg.(stu3Extensible); ok {
+		u.Extension = e.GetExtension()
+	}
+	return u
+}
 
-	if el, ok := ifc.(STU3Element); ok {
+// marshalValue is the field-level counterpart for marshalToTree, producing a
+// single node from a struct field's value. If the field contains an
+// stu3Element, itself a marshalNode, it is simply returned, otherwise the
+// field's value is recursed back into marshalToTree.
+func marshalValue(val reflect.Value, nodePath string) (marshalNode, *stu3Underscore, error) {
+	ifc := val.Interface()
+
+	msg, ok := ifc.(descriptor.Message)
+	if !ok {
+		return nil, nil, fmt.Errorf("cannot marshal non-descriptor.Message %T", ifc)
+	}
+	uscore := underscore(msg)
+
+	if el, ok := ifc.(stu3Element); ok {
 		uscore.ID = el.GetId()
 		// TODO(arrans) remove this once MarshalJSON is implemented on all
 		// Elements.
@@ -221,6 +268,66 @@ func marshalField(fld reflect.Value, nodePath string) (marshalNode, *STU3Undersc
 	}
 
 	return nil, nil, fmt.Errorf("unsupported field type %T", ifc)
+}
+
+func extractIfChoiceType(val reflect.Value, fld reflect.StructField, descs map[string]*dpb.FieldDescriptorProto) (reflect.Value, error) {
+	name, ok := protoName(fld.Tag)
+	if !ok {
+		return reflect.Value{}, nil
+	}
+	desc, ok := descs[name]
+	if !ok {
+		return reflect.Value{}, fmt.Errorf("no FieldDescriptor proto available for %s", name)
+	}
+	if !proto.HasExtension(desc.Options, pb.E_IsChoiceType) {
+		return reflect.Value{}, nil
+	}
+
+	// All the choice types have a oneof field of their same name, so we simply
+	// call GetX on a field named X.
+	fn := fmt.Sprintf("Get%s", fld.Name)
+	get := val.MethodByName(fn)
+	if !get.IsValid() {
+		return reflect.Value{}, fmt.Errorf("field %s has no %s() method", fld.Name, fn)
+	}
+	if t := get.Type(); t.Kind() != reflect.Func || t.NumIn() != 0 || t.NumOut() != 1 {
+		return reflect.Value{}, fmt.Errorf("%s.%s is not proto getter; must be function with nil input, returning 1 value", fld.Name, fn)
+	}
+	choice := get.Call(nil)
+	if n := len(choice); n != 1 {
+		return reflect.Value{}, fmt.Errorf("%s.%s() returned %d values; expecting 1", fld.Name, fn, n)
+	}
+
+	// As it's a oneof, the value will be an interface and the concrete type
+	// will be a pointer to a struct with exactly one field.
+	if t := choice[0].Type(); t.Kind() != reflect.Interface {
+		return reflect.Value{}, fmt.Errorf("%s.%s() must return interface; got %s", fld.Name, fn, t.Kind())
+	}
+	one := reflect.ValueOf(choice[0].Interface()).Elem()
+	if t := one.Type(); t.Kind() != reflect.Struct || t.NumField() != 1 {
+		return reflect.Value{}, fmt.Errorf("%s.%s() must have concrete-type *struct with one field; got Type %s", fld.Name, fn, t)
+	}
+	oneVal := one.Field(0)
+	if oneVal.Kind() != reflect.Ptr || oneVal.IsNil() {
+		return reflect.Value{}, fmt.Errorf("expecting non-nil pointer in single field of struct returned by %s.%s()", fld.Name, fn)
+	}
+
+	return oneVal, nil
+}
+
+func protoName(t reflect.StructTag) (string, bool) {
+	tag, ok := t.Lookup("protobuf")
+	if !ok {
+		return "", false
+	}
+	parts := strings.Split(tag, ",")
+	for _, p := range parts {
+		const pref = "name="
+		if strings.HasPrefix(p, pref) {
+			return strings.TrimPrefix(p, pref), true
+		}
+	}
+	return "", false
 }
 
 func jsonName(t reflect.StructTag) (string, bool) {

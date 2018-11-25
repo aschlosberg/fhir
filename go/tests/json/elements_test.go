@@ -9,52 +9,18 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/fhir/go/jsonfhir"
 
 	pb "github.com/google/fhir/proto/stu3"
 )
 
-// Compile-time checks that all primitive-type and special-purpose elements
-// satisfy the necessary interfaces for JSON marshalling.
-var (
-	// Primitives
-	_ jsonfhir.STU3Element = (*pb.Base64Binary)(nil)
-	_ jsonfhir.STU3Element = (*pb.Boolean)(nil)
-	_ jsonfhir.STU3Element = (*pb.Code)(nil)
-	_ jsonfhir.STU3Element = (*pb.Date)(nil)
-	_ jsonfhir.STU3Element = (*pb.DateTime)(nil)
-	_ jsonfhir.STU3Element = (*pb.Decimal)(nil)
-	_ jsonfhir.STU3Element = (*pb.Id)(nil)
-	_ jsonfhir.STU3Element = (*pb.Instant)(nil)
-	_ jsonfhir.STU3Element = (*pb.Integer)(nil)
-	_ jsonfhir.STU3Element = (*pb.Markdown)(nil)
-	_ jsonfhir.STU3Element = (*pb.Oid)(nil)
-	_ jsonfhir.STU3Element = (*pb.PositiveInt)(nil)
-	_ jsonfhir.STU3Element = (*pb.String)(nil)
-	_ jsonfhir.STU3Element = (*pb.Time)(nil)
-	_ jsonfhir.STU3Element = (*pb.UnsignedInt)(nil)
-	_ jsonfhir.STU3Element = (*pb.Uri)(nil)
-	_ jsonfhir.STU3Element = (*pb.Uuid)(nil)
-	// TODO(arrans): why doesn't Xhtml have Extensions? The pb.FHIRMessage
-	// interface may need to be split.
-	// _ jsonfhir.STU3Element = (*pb.Xhtml)(nil)
-
-	// Special-purpose elements
-	_ jsonfhir.STU3Element = (*pb.Dosage)(nil)
-	_ jsonfhir.STU3Element = (*pb.Extension)(nil)
-	_ jsonfhir.STU3Element = (*pb.Meta)(nil)
-	_ jsonfhir.STU3Element = (*pb.Narrative)(nil)
-	_ jsonfhir.STU3Element = (*pb.Reference)(nil)
-)
-
 // newEmptyElement returns a new FHIRPrimitive with the same concrete type as
 // msg.
-func newEmptyElement(t *testing.T, msg jsonfhir.STU3Element) jsonfhir.STU3Element {
+func newEmptyElement(t *testing.T, msg pbMarshaler) pbMarshaler {
 	t.Helper()
 	// TODO(arrans) is there a simpler way to get a new(x) without
 	// explicitly having the type?
 	concrete := reflect.ValueOf(msg).Elem().Type()
-	empty, ok := reflect.New(concrete).Interface().(jsonfhir.STU3Element)
+	empty, ok := reflect.New(concrete).Interface().(pbMarshaler)
 	if !ok {
 		// If this happens then the test is badly coded, not actually failing.
 		t.Fatalf("bad test setup; got ok==false when casting zero-valued proto message to Message interface")
@@ -62,9 +28,15 @@ func newEmptyElement(t *testing.T, msg jsonfhir.STU3Element) jsonfhir.STU3Elemen
 	return empty
 }
 
+type pbMarshaler interface {
+	proto.Message
+	json.Marshaler
+	json.Unmarshaler
+}
+
 func TestGoodConversions(t *testing.T) {
 	tests := []struct {
-		msg  jsonfhir.STU3Element
+		msg  pbMarshaler
 		json string
 	}{
 		{
@@ -246,7 +218,7 @@ func TestBadJSON(t *testing.T) {
 	tests := []struct {
 		// msg is used merely to define the type to which the JSON should be
 		// unmarshalled.
-		msg             jsonfhir.STU3Element
+		msg             pbMarshaler
 		json            string
 		wantErrContains string
 	}{
@@ -323,7 +295,7 @@ func TestBadJSON(t *testing.T) {
 func TestBadProto(t *testing.T) {
 	tests := []struct {
 		// msg is used merely to define the type to which the JSON should be
-		msg             jsonfhir.STU3Element
+		msg             pbMarshaler
 		wantErrContains string
 	}{
 		{

@@ -10,14 +10,18 @@ go_library(
     importpath = "github.com/google/fhir/go/jsonfhir",
     deps = [
         "//proto/stu3:go_default_library",
-        "@com_github_golang_glog//:go_default_library",
+        "@com_github_golang_protobuf//descriptor:go_default_library_gen",
         "@com_github_golang_protobuf//proto:go_default_library",
+        "@io_bazel_rules_go//proto/wkt:descriptor_go_proto",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["jsonfhir_test.go"],
+    srcs = [
+        "interfaces_test.go",
+        "jsonfhir_test.go",
+    ],
     embed = [":go_default_library"],
     deps = ["//proto/stu3:go_default_library"],
 )
