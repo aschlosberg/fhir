@@ -95,32 +95,31 @@ type nodeSlice []marshalNode
 
 func (nodeSlice) JSONFHIRMarshaler() {}
 
-// marshalToTree converts the resource into marshalTree, allowing for eventual
+// marshalToTree converts the message into marshalTree, allowing for eventual
 // marshaling with encoding/json.MarshalJSON(). It acts recursively via calls to
 // marshalValue, which may call marshalToTree, and is terminated by discovery of
 // stu3Elements in the STU3Resource. The nodePath carries the path to the node
 // in the tree that is currently being processed; therefore the original call
 // should have nodePath = "/".
-func marshalToTree(r STU3Resource, nodePath string) (_ marshalTree, retErr error) {
+func marshalToTree(msgInterface descriptor.Message, nodePath string) (_ marshalTree, retErr error) {
 	defer func() {
 		if retErr != nil {
 			retErr = fmt.Errorf("[%s] %v", nodePath, retErr)
 		}
 	}()
 
-	rVal := reflect.ValueOf(r)
-	if r == nil || rVal.IsNil() {
+	msgPtr := reflect.ValueOf(msgInterface)
+	if msgInterface == nil || msgPtr.IsNil() {
 		return nil, nil
 	}
 
-	// msg holds the protobuf message struct
-	msg := rVal.Elem()
+	msg := msgPtr.Elem()
 	if k := msg.Kind(); k != reflect.Struct {
 		return nil, fmt.Errorf("cannot convert non-struct (%s) to tree", k)
 	}
 
 	fldDescs := make(map[string]*dpb.FieldDescriptorProto)
-	_, md := descriptor.ForMessage(r)
+	_, md := descriptor.ForMessage(msgInterface)
 	for _, f := range md.Field {
 		fldDescs[f.GetName()] = f
 	}
@@ -179,7 +178,7 @@ func marshalToTree(r STU3Resource, nodePath string) (_ marshalTree, retErr error
 			uscores := make(nodeSlice, n)
 			var hasUnderscore bool
 			for i := 0; i < n; i++ {
-				mv, uscore, err := marshalValue(val, fmt.Sprintf("%s[%d]", nodePath, i))
+				mv, uscore, err := marshalValue(val.Index(i), fmt.Sprintf("%s[%d]", nodePath, i))
 				if err != nil {
 					return nil, err
 				}
@@ -245,18 +244,25 @@ func marshalValue(val reflect.Value, nodePath string) (marshalNode, *stu3Undersc
 
 	msg, ok := ifc.(descriptor.Message)
 	if !ok {
-		return nil, nil, fmt.Errorf("cannot marshal non-descriptor.Message %T", ifc)
+		return nil, nil, fmt.Errorf("cannot marshal non descriptor.Message %T", ifc)
 	}
 	uscore := underscore(msg)
 
 	if el, ok := ifc.(stu3Element); ok {
-		uscore.ID = el.GetId()
 		// TODO(arrans) remove this once MarshalJSON is implemented on all
 		// Elements.
 		if _, err := el.MarshalJSON(); err != nil && strings.Contains(err.Error(), "unimplemented") {
 			return nil, nil, err
 		}
 		return el, uscore, nil
+	}
+
+	if id, ok := ifc.(stu3Identifiable); ok {
+		mt, err := marshalToTree(id, nodePath)
+		if err != nil {
+			return nil, nil, err
+		}
+		return mt, uscore, nil
 	}
 
 	if res, ok := ifc.(STU3Resource); ok {
