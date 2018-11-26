@@ -260,16 +260,18 @@ func (p *Decimal) UnmarshalJSON(buf []byte) error {
 
 // MarshalJSON returns the message's value as FHIR-conformant JSON.
 func (p *Id) MarshalJSON() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalJSON unimplemented for %T", p)
+	return jsonString(p.Value), nil
 }
 
 // UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
 // buffer.
 func (p *Id) UnmarshalJSON(buf []byte) error {
-	if err := reMatch(p, buf); err != nil {
+	s, err := reMatchString(p, buf)
+	if err != nil {
 		return err
 	}
-	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
+	p.Value = s
+	return nil
 }
 
 // MarshalJSON returns the message's value as FHIR-conformant JSON.

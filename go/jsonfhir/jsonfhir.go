@@ -128,7 +128,7 @@ func marshalToTree(msgInterface descriptor.Message, baseNodePath string) (_ mars
 	}
 
 	tree := make(marshalTree)
-	if _, ok := msg.Interface().(STU3Resource); ok {
+	if _, ok := msgPtr.Interface().(STU3Resource); ok {
 		tree["resourceType"] = &pb.String{Value: msg.Type().Name()}
 	}
 
@@ -212,8 +212,8 @@ func marshalToTree(msgInterface descriptor.Message, baseNodePath string) (_ mars
 // for ID and extension attributes of primitives, as described by
 // https://www.hl7.org/fhir/json.html#primitive.
 type stu3Underscore struct {
-	ID        *pb.String      `json:"id,omitempty"`
-	Extension []*pb.Extension `json:"extension,omitempty"`
+	ID        *pb.String    `json:"id,omitempty"`
+	Extension []marshalTree `json:"extension,omitempty"`
 
 	marshalNode
 }
@@ -235,15 +235,23 @@ func (u *stu3Underscore) empty() bool {
 	return true
 }
 
-func underscore(msg proto.Message) *stu3Underscore {
+func underscore(msg proto.Message, nodePath string) (*stu3Underscore, error) {
 	u := new(stu3Underscore)
 	if i, ok := msg.(stu3Identifiable); ok {
 		u.ID = i.GetId()
 	}
 	if e, ok := msg.(stu3Extensible); ok {
-		u.Extension = e.GetExtension()
+		exts := e.GetExtension()
+		u.Extension = make([]marshalTree, len(exts))
+		var err error
+		for i, ex := range exts {
+			u.Extension[i], err = marshalToTree(ex, fmt.Sprintf("%s/%s[%d]", nodePath, "Extension", i))
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
-	return u
+	return u, nil
 }
 
 // marshalValue is the field-level counterpart for marshalToTree, producing a
@@ -254,12 +262,11 @@ func marshalValue(val reflect.Value, nodePath string) (marshalNode, *stu3Undersc
 	ifc := val.Interface()
 
 	if el, ok := ifc.(stu3Element); ok {
-		// TODO(arrans) remove this once MarshalJSON is implemented on all
-		// Elements.
-		if _, err := el.MarshalJSON(); err != nil && strings.Contains(err.Error(), "unimplemented") {
+		u, err := underscore(el, nodePath)
+		if err != nil {
 			return nil, nil, err
 		}
-		return el, underscore(el), nil
+		return el, u, nil
 	}
 
 	if id, ok := ifc.(stu3Identifiable); ok {

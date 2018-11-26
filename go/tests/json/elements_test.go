@@ -34,6 +34,8 @@ type pbMarshaler interface {
 	json.Unmarshaler
 }
 
+// TODO(arrans) test "null" JSON input
+
 func TestGoodConversions(t *testing.T) {
 	tests := []struct {
 		msg  pbMarshaler
@@ -108,6 +110,12 @@ func TestGoodConversions(t *testing.T) {
 				Value: `42`,
 			},
 			json: `42`,
+		},
+		{
+			msg: &pb.Id{
+				Value: `1234`,
+			},
+			json: `"1234"`,
 		},
 		{
 			msg: &pb.Integer{

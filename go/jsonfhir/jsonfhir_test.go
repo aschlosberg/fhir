@@ -28,56 +28,113 @@ func prettyJSON(j []byte) []byte {
 }
 
 func TestMarshalSTU3JSON(t *testing.T) {
-	// TODO(arrans) implement more tests once the function is mature and all
-	// STU3Elements actually have MarshalJSON() implemented.
-	p := &pb.Patient{
-		Active: &pb.Boolean{
-			Value: true,
-		},
-		BirthDate: &pb.Date{
-			Id: &pb.String{
-				Value: "theday",
+	tests := []struct {
+		name string
+		msg  STU3Resource
+		want string
+	}{
+		{
+			name: "resource type other than Patient",
+			msg: &pb.PaymentNotice{
+				Id: &pb.Id{Value: "final"},
 			},
-			Extension: []*pb.Extension{
-				{
-					Id:  &pb.String{Value: "thedayext"},
-					Url: &pb.Uri{Value: "www.example.com"},
+			want: `{"id":"final","resourceType":"PaymentNotice"}`,
+		},
+		{
+			name: "primitive type value only",
+			msg: &pb.Patient{
+				Active: &pb.Boolean{Value: true},
+			},
+			want: `{"active":true,"resourceType":"Patient"}`,
+		},
+		{
+			name: "primitive type value with ID",
+			msg: &pb.Patient{
+				Active: &pb.Boolean{
+					Value: true,
+					Id:    &pb.String{Value: "is-active"},
 				},
 			},
-			ValueUs:   529977600000000,
-			Precision: pb.Date_DAY,
+			want: `{"_active":{"id":"is-active"},"active":true,"resourceType":"Patient"}`,
 		},
-		Name: []*pb.HumanName{
-			{
-				Id: &pb.String{Value: "thename"},
-				Extension: []*pb.Extension{
-					{Id: &pb.String{Value: "nameext"}},
-				},
-				Family: &pb.String{Value: "Smith"},
-				Given: []*pb.String{
-					{
-						Value: "Mary",
+		{
+			name: "primitive type value with Extensions",
+			msg: &pb.Patient{
+				Active: &pb.Boolean{
+					Value: false,
+					Extension: []*pb.Extension{
+						{
+							Id:  &pb.String{Value: "exta"},
+							Url: &pb.Uri{Value: "/ext/a"},
+							Value: &pb.Extension_Value{
+								Value: &pb.Extension_Value_StringValue{
+									StringValue: &pb.String{Value: "extended"},
+								},
+							},
+						},
+						{
+							Id:  &pb.String{Value: "extb"},
+							Url: &pb.Uri{Value: "/ext/b"},
+							Value: &pb.Extension_Value{
+								Value: &pb.Extension_Value_Boolean{
+									Boolean: &pb.Boolean{Value: false},
+								},
+							},
+						},
 					},
-					{
-						Value: "Jane",
-						Id:    &pb.String{Value: "middle"},
+				},
+			},
+			want: `{"_active":{"extension":[{"id":"exta","url":"/ext/a","valueString":"extended"},{"id":"extb","url":"/ext/b","valueBoolean":false}]},"active":false,"resourceType":"Patient"}`,
+		},
+		{
+			name: "FHIR choice type (i.e. proto oneof)",
+			msg: &pb.Patient{
+				Deceased: &pb.Patient_Deceased{
+					Deceased: &pb.Patient_Deceased_Boolean{
+						Boolean: &pb.Boolean{Value: true},
 					},
 				},
 			},
+			want: `{"deceasedBoolean":true,"resourceType":"Patient"}`,
 		},
-		Deceased: &pb.Patient_Deceased{
-			Deceased: &pb.Patient_Deceased_Boolean{
-				Boolean: &pb.Boolean{Value: true},
+		{
+			name: "repeated values without underscore attributes",
+			msg: &pb.Patient{
+				Name: []*pb.HumanName{{
+					Given: []*pb.String{
+						{Value: "Mary"},
+						{Value: "Jane"},
+					},
+				}},
 			},
+			want: `{"name":[{"given":["Mary","Jane"]}],"resourceType":"Patient"}`,
+		},
+		{
+			name: "repeated values with underscore attributes",
+			msg: &pb.Patient{
+				Name: []*pb.HumanName{{
+					Given: []*pb.String{
+						{Value: "Mary"},
+						{
+							Value: "Jane",
+							Id:    &pb.String{Value: "middle"},
+						},
+					},
+				}},
+			},
+			want: `{"name":[{"_given":[null,{"id":"middle"}],"given":["Mary","Jane"]}],"resourceType":"Patient"}`,,
 		},
 	}
-	got, err := MarshalSTU3(p)
-	if err != nil {
-		t.Fatalf("MarshalSTU3JSON(%T %s) got err %v; want nil err", p, p, err)
-	}
-	want := []byte(`{"_birthDate":{"id":"theday","extension":[{"id":"thedayext","url":"www.example.com"}]},"active":true,"birthDate":"1986-10-18","deceasedBoolean":true,"name":[{"_given":[null,{"id":"middle"}],"extension":[{"id":"nameext"}],"family":"Smith","given":["Mary","Jane"],"id":"thename"}]}`)
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("MarshalSTU3JSON(%T %s) got:\n%s\nwant:\n%s", p, p, got, prettyJSON(want))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := MarshalSTU3(tt.msg)
+			if err != nil {
+				t.Fatalf("MarshalSTU3() got err %v; want nil err", err)
+			}
+			if want := []byte(tt.want); !reflect.DeepEqual(got, want) {
+				t.Errorf("MarshalSTU3()\n\ngot:\n%s\n\nwant:\n%s\n\ngot (pretty-printed):\n\n%s\n\nwant (pretty-printed):\n\n%s", got, want, prettyJSON(got), prettyJSON(want))
+			}
+		})
 	}
 }
 
