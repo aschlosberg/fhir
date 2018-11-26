@@ -34,7 +34,7 @@ import (
 // of extension options.
 
 // An STU3Resource is any descriptor.Message that has an stu3.Id logical
-// identifier.
+// identifier. All of the stu3 resource protos are STU3Resources.
 type STU3Resource interface {
 	descriptor.Message
 	GetId() *pb.Id
@@ -54,19 +54,20 @@ type stu3Identifiable interface {
 }
 
 // An stu3Element is an stu3Identifiable that also has a means of (un)marshaling
-// itself to and from JSON. All of the stu3 primitives are stu3Elements.
+// itself to and from JSON. All of the stu3 primitive primitive are
+// stu3Elements.
 type stu3Element interface {
 	stu3Identifiable
 	json.Marshaler
 	json.Unmarshaler
 
-	// JSONFHIRMarshaler is a no-op function, required internally by this
+	// IsJSONFHIRNode is a no-op function, required internally by this
 	// package simply to improve type safety at compile time, instead of using
 	// the empty interface{}.
-	JSONFHIRMarshaler()
+	IsJSONFHIRNode()
 }
 
-// MarshalSTU3 IS INCOMPLETE AND SHOULD NOT BE USED YET. It returns the Resouce
+// MarshalSTU3 IS INCOMPLETE AND SHOULD NOT BE USED YET. It returns the Resource
 // in JSON format.
 func MarshalSTU3(msg STU3Resource) ([]byte, error) {
 	m, err := marshalToTree(msg, "/")
@@ -83,24 +84,24 @@ func MarshalSTU3(msg STU3Resource) ([]byte, error) {
 // the same manner.
 type marshalTree map[string]marshalNode
 
-func (marshalTree) JSONFHIRMarshaler() {}
+func (marshalTree) IsJSONFHIRNode() {}
 
 // A marshalNode indicates that an arbitrary type can act as a node of a
 // marshalTree.
 type marshalNode interface {
-	JSONFHIRMarshaler()
+	IsJSONFHIRNode()
 }
 
 type nodeSlice []marshalNode
 
-func (nodeSlice) JSONFHIRMarshaler() {}
+func (nodeSlice) IsJSONFHIRNode() {}
 
 // marshalToTree converts the message into marshalTree, allowing for eventual
 // marshaling with encoding/json.MarshalJSON(). It acts recursively via calls to
 // marshalValue, which may call marshalToTree, and is terminated by discovery of
-// stu3Elements in the STU3Resource. The nodePath carries the path to the node
-// in the tree that is currently being processed; therefore the original call
-// should have nodePath = "/".
+// stu3Elements in the STU3Resource. The baseNodePath carries the path to the
+// node in the tree that is currently being processed, and is used for error
+// reporting; therefore the original call should have nodePath = "/".
 func marshalToTree(msgInterface descriptor.Message, baseNodePath string) (_ marshalTree, retErr error) {
 	nodePath := baseNodePath
 	defer func() {
@@ -150,6 +151,11 @@ func marshalToTree(msgInterface descriptor.Message, baseNodePath string) (_ mars
 			continue
 		}
 
+		// FHIR defines "choice types" which are equivalent to proto oneof
+		// except that they cannot repeat (as per
+		// https://www.hl7.org/fhir/formats.html#choice). They are treated
+		// identically to the regular types except that they have their type
+		// name appended to the JSON property name.
 		choice, err := extractIfChoiceType(val, fld, fldDescs)
 		if err != nil {
 			return nil, fmt.Errorf("detecting choice-type field: %v", err)
@@ -173,13 +179,10 @@ func marshalToTree(msgInterface descriptor.Message, baseNodePath string) (_ mars
 				tree[fmt.Sprintf("_%s", name)] = uscore
 			}
 		// A slice is treated in the exact same way as a pointer, but once for
-		// each element. The slice of Underscore properties is added if any
-		// element has a non-nil value.
+		// each element. The slice of Underscore properties is added iff at
+		// leaste one element has a non-nil underscore value.
 		case reflect.Slice:
 			n := val.Len()
-			if n == 0 {
-				break
-			}
 			all := make(nodeSlice, n)
 			uscores := make(nodeSlice, n)
 			var hasUnderscore bool
@@ -187,7 +190,7 @@ func marshalToTree(msgInterface descriptor.Message, baseNodePath string) (_ mars
 			for i := 0; i < n; i++ {
 				nodePath = fmt.Sprintf("%s%s[%d]/", baseNodePath, name, i)
 
-				mv, uscore, err := marshalValue(val.Index(i), fmt.Sprintf("%s[%d]", nodePath, i))
+				mv, uscore, err := marshalValue(val.Index(i), nodePath)
 				if err != nil {
 					return nil, err
 				}
@@ -210,7 +213,9 @@ func marshalToTree(msgInterface descriptor.Message, baseNodePath string) (_ mars
 
 // stu3Underscore represents a JSON property prepended with an underscore, used
 // for ID and extension attributes of primitives, as described by
-// https://www.hl7.org/fhir/json.html#primitive.
+// https://www.hl7.org/fhir/json.html#primitive. The Extensions are converted
+// to marshalTrees so as to properly handle their Value elements which can be of
+// any data type.
 type stu3Underscore struct {
 	ID        *pb.String    `json:"id,omitempty"`
 	Extension []marshalTree `json:"extension,omitempty"`
@@ -235,7 +240,12 @@ func (u *stu3Underscore) empty() bool {
 	return true
 }
 
+// underscore populates a new stu3Underscore from the msg. It returns an error
+// if the msg is not an stu3Element.
 func underscore(msg proto.Message, nodePath string) (*stu3Underscore, error) {
+	if _, ok := msg.(stu3Element); !ok {
+		return nil, fmt.Errorf("underscore properties must only be used for primitive types; got %T", msg)
+	}
 	u := new(stu3Underscore)
 	if i, ok := msg.(stu3Identifiable); ok {
 		u.ID = i.GetId()
@@ -370,8 +380,10 @@ func jsonName(t reflect.StructTag) (string, bool) {
 	return snakeToCamel(parts[0]), true
 }
 
+// snakeToCamel does what it says on the tin. Underscores are removed and, if
+// the next character is a lower-case alpha then it is converted to upper case.
+// All other characters remain unmodified.
 func snakeToCamel(s string) string {
-	s = strings.ToLower(s)
 	var b strings.Builder
 	b.Grow(len(s))
 
@@ -379,7 +391,9 @@ func snakeToCamel(s string) string {
 	for i, n := 0, len(s); i < n; i++ {
 		if s[i] == '_' {
 			b.WriteString(s[last:i])
-			i++
+			// Skip all the underscores
+			for i = i + 1; i < n && s[i] == '_'; i++ {
+			}
 			if i < n && s[i] >= 'a' && s[i] <= 'z' {
 				b.WriteByte(s[i] - 'a' + 'A')
 				i++

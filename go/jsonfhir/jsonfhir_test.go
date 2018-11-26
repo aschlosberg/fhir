@@ -122,9 +122,17 @@ func TestMarshalSTU3JSON(t *testing.T) {
 					},
 				}},
 			},
-			want: `{"name":[{"_given":[null,{"id":"middle"}],"given":["Mary","Jane"]}],"resourceType":"Patient"}`,,
+			want: `{"name":[{"_given":[null,{"id":"middle"}],"given":["Mary","Jane"]}],"resourceType":"Patient"}`,
+		},
+		{
+			name: "empty slice is not rendered",
+			msg: &pb.Patient{
+				Name: make([]*pb.HumanName, 0, 4),
+			},
+			want: `{"resourceType":"Patient"}`,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := MarshalSTU3(tt.msg)
@@ -147,7 +155,44 @@ func TestJSONName(t *testing.T) {
 }
 
 func TestSnakeToCamel(t *testing.T) {
-	// TODO(arrans)
+	tests := []struct {
+		snake, camel string
+	}{
+		{
+			snake: `hello`,
+			camel: `hello`,
+		},
+		{
+			snake: `hello_world`,
+			camel: `helloWorld`,
+		},
+		{
+			snake: `hello__world`,
+			camel: `helloWorld`,
+		},
+		{
+			snake: `he_llo_wo_rld`,
+			camel: `heLloWoRld`,
+		},
+		{
+			snake: `hello_`,
+			camel: `hello`,
+		},
+		{
+			snake: `hello_3orld`,
+			camel: `hello3orld`,
+		},
+		{
+			snake: `hELLo_world`,
+			camel: `hELLoWorld`,
+		},
+	}
+
+	for _, tt := range tests {
+		if got, want := snakeToCamel(tt.snake), tt.camel; got != want {
+			t.Errorf("snakeToCamel(%s) got %s; want %s", tt.snake, got, want)
+		}
+	}
 }
 
 func TestUnderscore(t *testing.T) {

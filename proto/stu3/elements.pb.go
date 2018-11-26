@@ -510,68 +510,68 @@ func (p *Reference) UnmarshalJSON(buf []byte) error {
 	return fmt.Errorf("UnmarshalJSON unimplemented for %T", p)
 }
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Base64Binary) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Base64Binary) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Boolean) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Boolean) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Code) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Code) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Date) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Date) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*DateTime) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*DateTime) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Decimal) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Decimal) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Id) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Id) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Instant) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Instant) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Integer) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Integer) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Markdown) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Markdown) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Oid) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Oid) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*PositiveInt) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*PositiveInt) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*String) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*String) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Time) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Time) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*UnsignedInt) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*UnsignedInt) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Uri) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Uri) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Uuid) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Uuid) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Dosage) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Dosage) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Extension) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Extension) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Meta) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Meta) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Narrative) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Narrative) IsJSONFHIRNode() {}
 
-// JSONFHIRMarshaler is a no-op. See jsonfhir.STU3Element interface for details.
-func (*Reference) JSONFHIRMarshaler() {}
+// IsJSONFHIRNode is a no-op. See jsonfhir.stu3Element interface for details.
+func (*Reference) IsJSONFHIRNode() {}
