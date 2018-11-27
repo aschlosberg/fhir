@@ -3,8 +3,13 @@ package jsonfhir
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"path"
 	"reflect"
 	"testing"
+
+	"github.com/golang/protobuf/proto"
 
 	pb "github.com/google/fhir/proto/stu3"
 )
@@ -142,6 +147,55 @@ func TestMarshalSTU3JSON(t *testing.T) {
 			if want := []byte(tt.want); !reflect.DeepEqual(got, want) {
 				t.Errorf("MarshalSTU3()\n\ngot:\n%s\n\nwant:\n%s\n\ngot (pretty-printed):\n\n%s\n\nwant (pretty-printed):\n\n%s", got, want, prettyJSON(got), prettyJSON(want))
 			}
+		})
+	}
+}
+
+func TestExamples(t *testing.T) {
+	t.Skip("Currently for development purposes only until package is fully implemented")
+
+	const (
+		jsonDir  = "../../testdata/stu3/ndjson"
+		protoDir = "../../testdata/stu3/examples"
+
+		jsonExt  = ".ndjson"
+		protoExt = ".prototxt"
+	)
+
+	tests := []struct {
+		name string
+	}{
+		{
+			name: "Patient-null",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			json, err := ioutil.ReadFile(path.Join(jsonDir, fmt.Sprintf("%s%s", tt.name, jsonExt)))
+			if err != nil {
+				t.Fatalf("JSON ReadFile(); got err %v; want nil err", err)
+			}
+			_ = json
+
+			protoStr, err := ioutil.ReadFile(path.Join(protoDir, fmt.Sprintf("%s%s", tt.name, protoExt)))
+			if err != nil {
+				t.Fatalf("proto ReadFile(); got err %v; want nil err", err)
+			}
+			// TODO(arrans) get the reflect.Type from proto.MessageType(), and
+			// then build msg based on the test's resourceType.
+			msg := &pb.Patient{}
+			if err := proto.UnmarshalText(string(protoStr), msg); err != nil {
+				t.Fatalf("unmarshal text proto: %v", err)
+			}
+
+			t.Run("proto to JSON", func(t *testing.T) {
+				got, err := MarshalSTU3(msg)
+				if err != nil {
+					t.Fatalf("MarshalSTU3() got err %v; want nil err", err)
+				}
+				t.Errorf("%s", prettyJSON(got))
+			})
 		})
 	}
 }

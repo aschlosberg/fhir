@@ -271,10 +271,20 @@ func underscore(msg proto.Message, nodePath string) (*stu3Underscore, error) {
 func marshalValue(val reflect.Value, nodePath string) (marshalNode, *stu3Underscore, error) {
 	ifc := val.Interface()
 
+	// TODO(arrans) remove this once all Elements have marshalling implemented.
+	unimplemented := func(v interface{}) *pb.String {
+		return &pb.String{
+			Value: fmt.Sprintf("UNIMPLEMENTED: %T", v),
+		}
+	}
+
 	if el, ok := ifc.(stu3Element); ok {
 		u, err := underscore(el, nodePath)
 		if err != nil {
 			return nil, nil, err
+		}
+		if _, err := el.MarshalJSON(); err != nil && strings.Contains(err.Error(), "unimplemented") {
+			return unimplemented(el), u, nil
 		}
 		return el, u, nil
 	}
@@ -293,6 +303,14 @@ func marshalValue(val reflect.Value, nodePath string) (marshalNode, *stu3Undersc
 			return nil, nil, err
 		}
 		return mt, nil, nil
+	}
+
+	switch msg := ifc.(type) {
+	case *pb.ContainedResource:
+		// TODO(arrans) implement marshalling of a ContainedResource (will
+		// likely use of extractIfChoiceType). For now, just return nil while
+		// implementing everything else.
+		return unimplemented(msg), nil, nil
 	}
 
 	return nil, nil, fmt.Errorf("unsupported field type %T", ifc)

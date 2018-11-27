@@ -312,12 +312,13 @@ func TestBadProto(t *testing.T) {
 		msg             pbMarshaler
 		wantErrContains string
 	}{
-		{
-			msg: &pb.Date{
-				Timezone: "+0100",
-			},
-			wantErrContains: "zone",
-		},
+		// See TODO in pb.Date.MarshalJSON re disabling of this test.
+		// {
+		// 	msg: &pb.Date{
+		// 		Timezone: "+0100",
+		// 	},
+		// 	wantErrContains: "zone",
+		// },
 		{
 			msg: &pb.Decimal{
 				Value: "42x",

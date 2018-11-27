@@ -22,6 +22,13 @@ go_test(
         "interfaces_test.go",
         "jsonfhir_test.go",
     ],
+    data = [
+        "//testdata/stu3:examples",
+        "//testdata/stu3:ndjson",
+    ],
     embed = [":go_default_library"],
-    deps = ["//proto/stu3:go_default_library"],
+    deps = [
+        "//proto/stu3:go_default_library",
+        "@com_github_golang_protobuf//proto:go_default_library",
+    ],
 )
