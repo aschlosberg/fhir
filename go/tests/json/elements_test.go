@@ -60,6 +60,12 @@ func TestGoodConversions(t *testing.T) {
 			json: `false`,
 		},
 		{
+			msg: &pb.Code{
+				Value: `secret`,
+			},
+			json: `"secret"`,
+		},
+		{
 			msg: &pb.Date{
 				ValueUs:   504921600000000,
 				Precision: pb.Date_YEAR,
@@ -148,6 +154,18 @@ func TestGoodConversions(t *testing.T) {
 			json: `-2147483648`,
 		},
 		{
+			msg: &pb.Markdown{
+				Value: "foobar",
+			},
+			json: `"foobar"`,
+		},
+		{
+			msg: &pb.Oid{
+				Value: "urn:oid:1.2345.678.9",
+			},
+			json: `"urn:oid:1.2345.678.9"`,
+		},
+		{
 			msg: &pb.PositiveInt{
 				Value: 1,
 			},
@@ -201,6 +219,12 @@ func TestGoodConversions(t *testing.T) {
 			},
 			json: `"urn:uuid:53fefa32-fcbb-4ff8-8a92-55ee120877b7"`,
 		},
+		{
+			msg: &pb.Uuid{
+				Value: `urn:uuid:53fefa32-fcbb-4ff8-8a92-55ee120877b7`,
+			},
+			json: `"urn:uuid:53fefa32-fcbb-4ff8-8a92-55ee120877b7"`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -237,6 +261,26 @@ func TestBadJSON(t *testing.T) {
 		wantErrContains string
 	}{
 		{
+			msg:             &pb.Code{},
+			json:            `" leading space"`,
+			wantErrContains: "regex",
+		},
+		{
+			msg:             &pb.Code{},
+			json:            `"trailing space "`,
+			wantErrContains: "regex",
+		},
+		{
+			msg:             &pb.Code{},
+			json:            `"two  spaces"`,
+			wantErrContains: "regex",
+		},
+		{
+			msg:             &pb.Code{},
+			json:            `42`,
+			wantErrContains: "string",
+		},
+		{
 			msg:             &pb.Date{},
 			json:            `"1986-"`,
 			wantErrContains: "regex",
@@ -262,6 +306,21 @@ func TestBadJSON(t *testing.T) {
 			wantErrContains: "32",
 		},
 		{
+			msg:             &pb.Markdown{},
+			json:            `42`,
+			wantErrContains: "string",
+		},
+		{
+			msg:             &pb.Oid{},
+			json:            `"urn:oid:03.1234"`,
+			wantErrContains: "regex", // leading zero
+		},
+		{
+			msg:             &pb.Oid{},
+			json:            `1234.5678`,
+			wantErrContains: "string",
+		},
+		{
 			msg:             &pb.PositiveInt{},
 			json:            `"y"`,
 			wantErrContains: "regex",
@@ -283,6 +342,11 @@ func TestBadJSON(t *testing.T) {
 			wantErrContains: "empty",
 		},
 		{
+			msg:             &pb.String{},
+			json:            `42`,
+			wantErrContains: "string",
+		},
+		{
 			msg:             &pb.UnsignedInt{},
 			json:            `"z"`,
 			wantErrContains: "regex",
@@ -291,6 +355,16 @@ func TestBadJSON(t *testing.T) {
 			msg:             &pb.UnsignedInt{},
 			json:            fmt.Sprintf("%d", uint64(math.MaxUint32)+1),
 			wantErrContains: "32",
+		},
+		{
+			msg:             &pb.Uuid{},
+			json:            `"urn:uuid:xyz"`,
+			wantErrContains: "regex",
+		},
+		{
+			msg:             &pb.Uuid{},
+			json:            `42`,
+			wantErrContains: "string",
 		},
 	}
 
