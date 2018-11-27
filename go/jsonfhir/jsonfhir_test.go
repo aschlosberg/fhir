@@ -136,6 +136,7 @@ func TestMarshalSTU3JSON(t *testing.T) {
 			},
 			want: `{"resourceType":"Patient"}`,
 		},
+		// TODO(arrans) test ContainedResources
 	}
 
 	for _, tt := range tests {

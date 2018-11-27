@@ -19,6 +19,7 @@ package jsonfhir
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -307,13 +308,34 @@ func marshalValue(val reflect.Value, nodePath string) (marshalNode, *stu3Undersc
 
 	switch msg := ifc.(type) {
 	case *pb.ContainedResource:
-		// TODO(arrans) implement marshalling of a ContainedResource (will
-		// likely use of extractIfChoiceType). For now, just return nil while
-		// implementing everything else.
-		return unimplemented(msg), nil, nil
+		mt, err := marshalContainedResource(msg, nodePath)
+		if err != nil {
+			return nil, nil, err
+		}
+		return mt, nil, nil
 	}
 
 	return nil, nil, fmt.Errorf("unsupported field type %T", ifc)
+}
+
+// marshalContainedResource extracts the oneof from the ContainedResource and
+// returns it as a marshalTree.
+func marshalContainedResource(msg *pb.ContainedResource, nodePath string) (marshalTree, error) {
+	res := reflect.ValueOf(msg.GetOneofResource())
+	if t := res.Type(); t.Kind() != reflect.Ptr || res.IsNil() {
+		return nil, errors.New("ContainedResource must contain non-nil pointer")
+	}
+
+	val, err := extractSingleStructField(res.Elem())
+	if valid := val.IsValid(); err != nil || !valid {
+		return nil, fmt.Errorf("marshaling ContainedResource: valid reflect.Value? %t; err: %v", valid, err)
+	}
+
+	r, ok := val.Interface().(STU3Resource)
+	if !ok {
+		return nil, fmt.Errorf("ContainedResource didn't contained %s which is not a Resource", val.Type().Name())
+	}
+	return marshalToTree(r, nodePath)
 }
 
 // extractIfChoiceType receives a struct field's value and respective
@@ -357,16 +379,25 @@ func extractIfChoiceType(val reflect.Value, fld reflect.StructField, descs map[s
 	if t := choice[0].Type(); t.Kind() != reflect.Interface || choice[0].IsNil() {
 		return reflect.Value{}, fmt.Errorf("%s.%s() must return interface containing non-nil value; got %s", fld.Name, fn, t.Kind())
 	}
-	one := reflect.ValueOf(choice[0].Interface()).Elem()
-	if t := one.Type(); t.Kind() != reflect.Struct || t.NumField() != 1 {
-		return reflect.Value{}, fmt.Errorf("%s.%s() must have concrete-type *struct with one field; got Type %s", fld.Name, fn, t)
-	}
-	oneVal := one.Field(0)
-	if oneVal.Kind() != reflect.Ptr || oneVal.IsNil() {
-		return reflect.Value{}, fmt.Errorf("expecting non-nil pointer in single field of struct returned by %s.%s()", fld.Name, fn)
-	}
 
-	return oneVal, nil
+	v, err := extractSingleStructField(reflect.ValueOf(choice[0].Interface()).Elem())
+	if err != nil {
+		return reflect.Value{}, fmt.Errorf("%s.%s(): %v", fld.Name, fn, err)
+	}
+	return v, nil
+}
+
+// extractSingleStructField expects structPtr to be of a type with exactly one
+// field, which will be returned.
+func extractSingleStructField(structPtr reflect.Value) (reflect.Value, error) {
+	if t := structPtr.Type(); t.Kind() != reflect.Struct || t.NumField() != 1 {
+		return reflect.Value{}, fmt.Errorf("must have concrete-type *struct with one field; got Type %s of Kind %s", t, t.Kind())
+	}
+	val := structPtr.Field(0)
+	if val.Kind() != reflect.Ptr || val.IsNil() {
+		return reflect.Value{}, fmt.Errorf("expecting non-nil pointer in single field of struct type %s", val.Type().Name())
+	}
+	return val, nil
 }
 
 func protoName(t reflect.StructTag) (string, bool) {
