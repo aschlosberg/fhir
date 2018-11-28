@@ -6,7 +6,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["jsonfhir.go"],
+    srcs = [
+        "jsonfhir.go",
+        "unmarshal.go",
+    ],
     importpath = "github.com/google/fhir/go/jsonfhir",
     deps = [
         "//proto/stu3:go_default_library",

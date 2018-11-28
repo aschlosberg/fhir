@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"path"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
@@ -152,9 +153,49 @@ func TestMarshalSTU3JSON(t *testing.T) {
 	}
 }
 
-func TestExamples(t *testing.T) {
-	t.Skip("Currently for development purposes only until package is fully implemented")
+func TestNewSTU3Resource(t *testing.T) {
+	t.Run("errors", func(t *testing.T) {
+		tests := []struct {
+			typ, want string
+		}{
+			{
+				typ:  "foo",
+				want: "name",
+			},
+			{
+				typ:  "Boolean",
+				want: "Resource",
+			},
+		}
 
+		for _, tt := range tests {
+			_, err := newSTU3Resource(tt.typ)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("newSTU3Resource(%q) got err %v; want containing %q", tt.typ, err, tt.want)
+			}
+		}
+	})
+
+	t.Run("good", func(t *testing.T) {
+		for _, resourceType := range []string{"Patient", "PaymentNotice"} {
+			t.Run(resourceType, func(t *testing.T) {
+				got, err := newSTU3Resource(resourceType)
+				if err != nil {
+					t.Fatalf(`newSTU3Resource(%q) got err %v; want nil err`, resourceType, err)
+				}
+
+				if got, want := reflect.TypeOf(got).String(), fmt.Sprintf("*stu3.%s", resourceType); got != want {
+					t.Errorf("newSTU3Resource(%q) got reflect.Type %s; want %s", resourceType, got, want)
+				}
+				if v := reflect.ValueOf(got); got == nil || v.Kind() != reflect.Ptr || v.IsNil() {
+					t.Errorf("newSTU3Resource(%q) got %T(%v); want non-nil pointer", resourceType, got, got)
+				}
+			})
+		}
+	})
+}
+
+func TestExamples(t *testing.T) {
 	const (
 		jsonDir  = "../../testdata/stu3/ndjson"
 		protoDir = "../../testdata/stu3/examples"
@@ -183,19 +224,38 @@ func TestExamples(t *testing.T) {
 			if err != nil {
 				t.Fatalf("proto ReadFile(); got err %v; want nil err", err)
 			}
-			// TODO(arrans) get the reflect.Type from proto.MessageType(), and
-			// then build msg based on the test's resourceType.
-			msg := &pb.Patient{}
-			if err := proto.UnmarshalText(string(protoStr), msg); err != nil {
-				t.Fatalf("unmarshal text proto: %v", err)
+
+			newRes := func() STU3Resource {
+				typ := strings.Split(tt.name, "-")[0]
+				res, err := newSTU3Resource(typ)
+				if err != nil {
+					t.Fatalf("NewSTU3Resource(%q) got err %v; want nil err", typ, err)
+				}
+				return res
 			}
 
 			t.Run("proto to JSON", func(t *testing.T) {
+				t.Skip("Currently for development purposes only until package is fully implemented")
+
+				msg := newRes()
+				if err := proto.UnmarshalText(string(protoStr), msg); err != nil {
+					t.Fatalf("unmarshal text proto: %v", err)
+				}
 				got, err := MarshalSTU3(msg)
 				if err != nil {
 					t.Fatalf("MarshalSTU3() got err %v; want nil err", err)
 				}
 				t.Errorf("%s", prettyJSON(got))
+			})
+
+			t.Run("JSON to proto", func(t *testing.T) {
+				t.Skip("Currently for development purposes only until package is fully implemented")
+
+				msg := newRes()
+				if err := UnmarshalSTU3(json, msg); err != nil {
+					t.Fatalf("UnmarshalSTU3() got err %v; want nil err", err)
+				}
+				t.Error(proto.MarshalTextString(msg))
 			})
 		})
 	}
