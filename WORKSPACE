@@ -102,5 +102,25 @@ http_archive(
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains")
 go_rules_dependencies()
 go_register_toolchains()
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 gazelle_dependencies()
+
+# Drop-in replacement for encoding/json that unmarshals numbers to json.Number,
+# which is necessary for maintaining float precision.
+go_repository(
+    name = "com_github_json-iterator_go",
+    importpath = "github.com/json-iterator/go",
+    commit = "1624edc4454b8682399def8740d46db5e4362ba4",
+)
+
+# Required by json-iterator
+go_repository(
+    name = "com_github_modern_go_reflect2",
+    importpath = "github.com/modern-go/reflect2",
+    commit = "94122c33edd36123c84d5368cfb2b69df93a0ec8",
+)
+go_repository(
+    name = "com_github_modern_go_concurrent",
+    importpath = "github.com/modern-go/concurrent",
+    commit = "bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94",
+)
