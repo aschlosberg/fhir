@@ -195,6 +195,24 @@ func TestNewSTU3Resource(t *testing.T) {
 	})
 }
 
+// newSTU3Resource returns a new STU3Resource of the specified concrete type.
+func newSTU3Resource(typ string) (STU3Resource, error) {
+	t := proto.MessageType(fmt.Sprintf("google.fhir.stu3.proto.%s", typ))
+	if t == nil || t.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("no stu3 proto.Message named %s", typ)
+	}
+	v := value(t)
+	if !v.CanInterface() {
+		return nil, fmt.Errorf("cannot get interface of stu3.%s message", typ)
+	}
+	ifc := v.Interface()
+	res, ok := ifc.(STU3Resource)
+	if !ok {
+		return nil, fmt.Errorf("%T does not implement STU3Resource interface", ifc)
+	}
+	return res, nil
+}
+
 func TestExamples(t *testing.T) {
 	const (
 		jsonDir  = "../../testdata/stu3/ndjson"

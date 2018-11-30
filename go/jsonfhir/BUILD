@@ -15,8 +15,8 @@ go_library(
         "//proto/stu3:go_default_library",
         "@com_github_golang_protobuf//descriptor:go_default_library_gen",
         "@com_github_golang_protobuf//proto:go_default_library",
-        "@io_bazel_rules_go//proto/wkt:descriptor_go_proto",
         "@com_github_json-iterator_go//:go_default_library",
+        "@io_bazel_rules_go//proto/wkt:descriptor_go_proto",
     ],
 )
 
@@ -25,6 +25,7 @@ go_test(
     srcs = [
         "interfaces_test.go",
         "jsonfhir_test.go",
+        "unmarshal_test.go",
     ],
     data = [
         "//testdata/stu3:examples",

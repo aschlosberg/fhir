@@ -37,9 +37,9 @@ const (
 	escapedDoubleQuote = `\"`
 )
 
-// jsonString returns s as a JSON string in double quotes, escaping any existing
+// JSONString returns s as a JSON string in double quotes, escaping any existing
 // double quotes.
-func jsonString(s string) []byte {
+func JSONString(s string) []byte {
 	return []byte(fmt.Sprintf(
 		`"%s"`,
 		strings.Replace(s, doubleQuote, escapedDoubleQuote, -1),
@@ -47,7 +47,7 @@ func jsonString(s string) []byte {
 }
 
 // reMatchString strips surrounding double quotes and unescapes remaining double
-// quotes, i.e. undoes jsonString(), before checking the resulting string with
+// quotes, i.e. undoes JSONString(), before checking the resulting string with
 // reMatch() and returning it.
 func reMatchString(msg descriptor.Message, json []byte) (string, error) {
 	n := len(json)
@@ -106,7 +106,7 @@ func reMatch(msg descriptor.Message, json []byte) error {
 
 // MarshalJSON returns the message's value as FHIR-conformant JSON.
 func (p *Base64Binary) MarshalJSON() ([]byte, error) {
-	return jsonString(base64.StdEncoding.EncodeToString(p.Value)), nil
+	return JSONString(base64.StdEncoding.EncodeToString(p.Value)), nil
 }
 
 // UnmarshalJSON populates the message's value based on the
@@ -151,7 +151,7 @@ func (p *Boolean) UnmarshalJSON(buf []byte) error {
 
 // MarshalJSON returns the message's value as FHIR-conformant JSON.
 func (p *Code) MarshalJSON() ([]byte, error) {
-	return jsonString(p.Value), nil
+	return JSONString(p.Value), nil
 }
 
 // UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
@@ -203,7 +203,7 @@ func (p *Date) MarshalJSON() ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unknown precision[%d]", p.Precision)
 	}
-	return jsonString(p.Time().Format(layout)), nil
+	return JSONString(p.Time().Format(layout)), nil
 }
 
 var datePrecisionLayout = map[Date_Precision]string{
@@ -265,7 +265,7 @@ func (p *Decimal) UnmarshalJSON(buf []byte) error {
 
 // MarshalJSON returns the message's value as FHIR-conformant JSON.
 func (p *Id) MarshalJSON() ([]byte, error) {
-	return jsonString(p.Value), nil
+	return JSONString(p.Value), nil
 }
 
 // UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
@@ -314,7 +314,7 @@ func (p *Integer) UnmarshalJSON(buf []byte) error {
 
 // MarshalJSON returns the message's value as FHIR-conformant JSON.
 func (p *Markdown) MarshalJSON() ([]byte, error) {
-	return jsonString(p.Value), nil
+	return JSONString(p.Value), nil
 }
 
 // UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
@@ -330,7 +330,7 @@ func (p *Markdown) UnmarshalJSON(buf []byte) error {
 
 // MarshalJSON returns the message's value as FHIR-conformant JSON.
 func (p *Oid) MarshalJSON() ([]byte, error) {
-	return jsonString(p.Value), nil
+	return JSONString(p.Value), nil
 }
 
 // UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
@@ -373,7 +373,7 @@ func (p *String) MarshalJSON() ([]byte, error) {
 	if p.Value == "" {
 		return nil, errors.New(noEmptyString)
 	}
-	return jsonString(p.Value), nil
+	return JSONString(p.Value), nil
 }
 
 // UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
@@ -425,7 +425,7 @@ func (p *UnsignedInt) UnmarshalJSON(buf []byte) error {
 
 // MarshalJSON returns the message's value as FHIR-conformant JSON.
 func (p *Uri) MarshalJSON() ([]byte, error) {
-	return jsonString(p.Value), nil
+	return JSONString(p.Value), nil
 }
 
 // UnmarshalJSON populates the message's value based on the FHIR-conformant JSON
@@ -441,7 +441,7 @@ func (p *Uri) UnmarshalJSON(buf []byte) error {
 
 // MarshalJSON returns the message's value as FHIR-conformant JSON.
 func (p *Uuid) MarshalJSON() ([]byte, error) {
-	return jsonString(p.Value), nil
+	return JSONString(p.Value), nil
 }
 
 // UnmarshalJSON populates the message's value based on the FHIR-conformant JSON

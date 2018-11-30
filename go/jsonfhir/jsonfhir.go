@@ -130,7 +130,7 @@ func marshalToTree(msgInterface descriptor.Message, baseNodePath string) (_ mars
 	}
 
 	tree := make(marshalTree)
-	if _, ok := msgPtr.Interface().(STU3Resource); ok {
+	if _, ok := msgInterface.(STU3Resource); ok {
 		tree["resourceType"] = &pb.String{Value: msg.Type().Name()}
 	}
 
